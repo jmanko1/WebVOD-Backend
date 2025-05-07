@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/WebVOD-Backend/appsettings.json
+/WebVOD-Backend/appsettings.json
+/WebVOD-Backend/appsettings.Development.json
