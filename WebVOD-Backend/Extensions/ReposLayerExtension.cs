@@ -8,6 +8,8 @@ public static class ReposLayerExtension
     public static IServiceCollection ConfigureReposLayer(this IServiceCollection services)
     {
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IFailedLoginLogRepository, FailedLoginLogRepository>();
+        services.AddScoped<IUserBlockadeRepository, UserBlockadeRepository>();
 
         return services;
     }

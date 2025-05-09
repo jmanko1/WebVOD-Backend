@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
+using Isopoh.Cryptography.Argon2;
 using WebVOD_Backend.Services.Interfaces;
 
 namespace WebVOD_Backend.Services.Implementations;
@@ -79,11 +79,45 @@ public class CryptoService : ICryptoService
 
     public string HashPassword(string password)
     {
-        throw new NotImplementedException();
+        byte[] saltBytes = new byte[16];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(saltBytes);
+        }
+
+        var config = new Argon2Config
+        {
+            Password = Encoding.UTF8.GetBytes(password),
+            Salt = saltBytes
+        };
+
+        using var hasher = new Argon2(config);
+        using var hashBytes = hasher.Hash();
+
+        var base64Hash = Convert.ToBase64String(hashBytes.Buffer);
+        var base64Salt = Convert.ToBase64String(saltBytes);
+
+        return base64Salt + base64Hash;
     }
 
     public bool VerifyPassword(string inputPassword, string hashedPassword)
     {
-        throw new NotImplementedException();
+        var saltBase64 = hashedPassword.Substring(0, 24);
+        var storedHash = hashedPassword.Substring(24);
+
+        byte[] saltBytes = Convert.FromBase64String(saltBase64);
+
+        var config = new Argon2Config
+        {
+            Password = Encoding.UTF8.GetBytes(inputPassword),
+            Salt = saltBytes
+        };
+
+        using var hasher = new Argon2(config);
+        using var hashBytes = hasher.Hash();
+
+        var base64Hash = Convert.ToBase64String(hashBytes.Buffer);
+
+        return base64Hash == storedHash;
     }
 }

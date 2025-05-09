@@ -8,6 +8,9 @@ public static class ServicesLayerExtension
     public static IServiceCollection ConfigureServicesLayer(this IServiceCollection services)
     {
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ICryptoService, CryptoService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IJwtService, JwtService>();
 
         return services;
     }

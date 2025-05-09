@@ -15,7 +15,7 @@ public class JwtService : IJwtService
         _configuration = configuration;
     }
 
-    public string GenerateJwtToken(int userId)
+    public string GenerateJwtToken(string userId)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
@@ -23,7 +23,7 @@ public class JwtService : IJwtService
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString(), ClaimValueTypes.Integer32),
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
@@ -39,5 +39,13 @@ public class JwtService : IJwtService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public int GetExpiresIn()
+    {
+        var jwtSettings = _configuration.GetSection("JwtSettings");
+        var lifetime = jwtSettings.GetValue<int>("Lifetime");
+
+        return lifetime;
     }
 }
