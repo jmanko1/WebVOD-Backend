@@ -16,6 +16,7 @@ public class FailedLoginLogRepository : IFailedLoginLogRepository
         var database = client.GetDatabase(settings.Value.DbName);
         _failedLoginLogs = database.GetCollection<FailedLoginLog>("FailedLoginLogs");
     }
+
     public async Task Add(FailedLoginLog log)
     {
         await _failedLoginLogs.InsertOneAsync(log);

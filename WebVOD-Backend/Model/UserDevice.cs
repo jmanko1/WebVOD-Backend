@@ -4,18 +4,21 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace WebVOD_Backend.Model;
 
-public class UserBlockade
+public class UserDevice
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; }
 
     [Required]
+    public string Name { get; set; }
+
+    [Required]
     public string UserId { get; set; }
 
     [Required]
-    public DateTime Since { get; set; } = DateTime.Now;
+    public DateTime RegisteredAt { get; set; } = DateTime.Now;
 
     [Required]
-    public DateTime Until { get; set; } = DateTime.Now.AddMinutes(10);
+    public DateTime ValidUntil { get; set; } = DateTime.Now.AddDays(90);
 }

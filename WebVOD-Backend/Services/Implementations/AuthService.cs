@@ -14,14 +14,16 @@ public class AuthService : IAuthService
     private readonly IUserBlockadeRepository _blockadeRepository;
     private readonly ICryptoService _cryptoService;
     private readonly IJwtService _jwtService;
+    private readonly IUserDeviceRepository _userDeviceRepository;
 
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IUserDeviceRepository userDeviceRepository)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
         _blockadeRepository = blockadeRepository;
         _cryptoService = cryptoService;
         _jwtService = jwtService;
+        _userDeviceRepository = userDeviceRepository;
     }
 
     public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest)
@@ -68,21 +70,44 @@ public class AuthService : IAuthService
 
         if(!user.IsTFAEnabled)
         {
-            var token = _jwtService.GenerateJwtToken(user.Id);
-            var loginResponse = new LoginResponseDto
-            {
-                StatusCode = 200,
-                Token = token,
-                ExpiresIn = _jwtService.GetExpiresIn()
-            };
-
-            return loginResponse;
+            return GenerateLoginResponse(200, user.Id);
         }
 
+        // TFA jest włączone
+        if(user.TFAMethod == TFAMethod.ALWAYS)
+        {
+            return GenerateRedirectResponse(301, "http://localhost:3000/login/code");
+        }
+
+        // Tylko nowe urządzenie
+        var device = await _userDeviceRepository.FindByNameAndUserId(sourceDevice, user.Id);
+        if(device == null || device.ValidUntil < DateTime.Now)
+        {
+            return GenerateRedirectResponse(301, "http://localhost:3000/login/code");
+        }
+
+        return GenerateLoginResponse(200, user.Id);
+    }
+
+    private LoginResponseDto GenerateLoginResponse(int statusCode, string userId)
+    {
+        var token = _jwtService.GenerateJwtToken(userId);
+        var loginResponse = new LoginResponseDto
+        {
+            StatusCode = 200,
+            Token = token,
+            ExpiresIn = _jwtService.GetExpiresIn()
+        };
+
+        return loginResponse;
+    }
+
+    private LoginResponseDto GenerateRedirectResponse(int statusCode, string redirectUrl)
+    {
         var redirectResponse = new LoginResponseDto
         {
-            StatusCode = 301,
-            RedirectUrl = "http://localhost:3000/login/code"
+            StatusCode = statusCode,
+            RedirectUrl = redirectUrl
         };
 
         return redirectResponse;
@@ -100,7 +125,7 @@ public class AuthService : IAuthService
             throw new RequestErrorException(400, "Ten adres email jest zajęty.");
         }
 
-        var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(32));
+        var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
 
         var user = new User
         {
