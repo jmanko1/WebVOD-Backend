@@ -17,6 +17,9 @@ public class UserDevice
     public string UserId { get; set; }
 
     [Required]
+    public DateTime LastLoginAt { get; set; } = DateTime.Now;
+
+    [Required]
     public DateTime RegisteredAt { get; set; } = DateTime.Now;
 
     [Required]

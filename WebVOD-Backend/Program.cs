@@ -25,6 +25,15 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(10);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+builder.Services.AddDistributedMemoryCache();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -34,6 +43,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+app.UseSession();
 
 app.UseAuthorization();
 app.UseAuthentication();

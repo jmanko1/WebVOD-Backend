@@ -40,4 +40,13 @@ public class UserDeviceRepository : IUserDeviceRepository
 
         await _userDevices.UpdateOneAsync(filter, update);
     }
+
+    public async Task UpdateLastLoginAt(string id, DateTime lastLoginAt)
+    {
+        var filter = Builders<UserDevice>.Filter.Eq(d => d.Id, id);
+        var update = Builders<UserDevice>.Update
+            .Set(d => d.LastLoginAt, lastLoginAt);
+
+        await _userDevices.UpdateOneAsync(filter, update);
+    }
 }

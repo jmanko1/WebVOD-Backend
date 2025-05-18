@@ -35,6 +35,12 @@ public class UserRepository : IUserRepository
         return await _users.Find(filter).AnyAsync();
     }
 
+    public async Task<User> FindById(string id)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, id);
+        return await _users.Find(filter).FirstOrDefaultAsync();
+    }
+
     public async Task<User> FindByLogin(string login)
     {
         var filter = Builders<User>.Filter.Eq(u => u.Login, login);

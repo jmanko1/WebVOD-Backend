@@ -36,6 +36,20 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("Login/Code")]
+    public async Task<ActionResult<LoginResponseDto>> Code([FromBody] string code)
+    {
+        try
+        {
+            var response = await _authService.Code(code, HttpContext, Request);
+            return Ok(response);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message});
+        }
+    }
+
     [HttpPost("Register")]
     public async Task<ActionResult> Register([FromBody] RegisterDto registerDto)
     {
