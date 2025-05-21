@@ -46,18 +46,18 @@ public class AuthService : IAuthService
         if (!user.IsTFAEnabled)
         {
             await HandleTrustedDevice(savedDevice, sourceDevice, user.Id);
-            return GenerateLoginResponse(200, user.Id);
+            return GenerateLoginResponse(user.Id);
         }
 
         if (IsTfaRequired(user, savedDevice))
         {
             SaveTfaSession(httpContext, user.Id);
-            return GenerateRedirectResponse(301, "http://localhost:3000/login/code");
+            return GenerateTFAResponse();
         }
 
         await _userDeviceRepository.UpdateLastLoginAt(savedDevice.Id, DateTime.Now);
 
-        return GenerateLoginResponse(200, user.Id);
+        return GenerateLoginResponse(user.Id);
     }
 
     private async Task<User> GetUserByLoginSecurely(string login, string password)
@@ -141,23 +141,22 @@ public class AuthService : IAuthService
         context.Session.SetInt32("auth_attempts", 0);
     }
 
-    private LoginResponseDto GenerateLoginResponse(int statusCode, string userId)
+    private LoginResponseDto GenerateLoginResponse(string userId)
     {
         var token = _jwtService.GenerateJwtToken(userId);
         return new LoginResponseDto
         {
-            StatusCode = statusCode,
             Token = token,
-            ExpiresIn = _jwtService.GetExpiresIn()
+            ExpiresIn = _jwtService.GetExpiresIn(),
+            TFARequired = false
         };
     }
 
-    private LoginResponseDto GenerateRedirectResponse(int statusCode, string redirectUrl)
+    private LoginResponseDto GenerateTFAResponse()
     {
         return new LoginResponseDto
         {
-            StatusCode = statusCode,
-            RedirectUrl = redirectUrl
+            TFARequired = true
         };
     }
 
@@ -242,7 +241,7 @@ public class AuthService : IAuthService
         var savedDevice = await _userDeviceRepository.FindByNameAndUserId(sourceDevice, user.Id);
         await HandleTrustedDevice(savedDevice, sourceDevice, user.Id, updateValidationDates: true);
 
-        return GenerateLoginResponse(200, user.Id);
+        return GenerateLoginResponse(user.Id);
     }
 
     private void ClearTfaSession(HttpContext context)

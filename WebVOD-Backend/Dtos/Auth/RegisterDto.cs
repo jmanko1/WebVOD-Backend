@@ -24,6 +24,6 @@ public class RegisterDto
     public string Password { get; set; }
 
     [Required(ErrorMessage = "Potwierdź hasło.")]
-    [Compare("Password", ErrorMessage = "Hasła nie są identyczne.")]
+    [Compare("Password", ErrorMessage = "Podane hasła nie są identyczne.")]
     public string ConfirmPassword { get; set; }
 }

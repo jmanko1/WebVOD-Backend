@@ -22,13 +22,8 @@ public class AuthController : ControllerBase
         try
         {
             var response = await _authService.Authenticate(loginDto, HttpContext, Request);
-            
-            if(response.StatusCode == 200)
-            {
-                return Ok(response);
-            }
 
-            return Redirect(response.RedirectUrl);
+            return Ok(response);
         }
         catch (RequestErrorException ex)
         {
