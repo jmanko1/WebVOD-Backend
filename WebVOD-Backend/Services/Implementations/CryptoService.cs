@@ -77,6 +77,36 @@ public class CryptoService : ICryptoService
         }
     }
 
+    public string GenerateResetPasswordToken(int n)
+    {
+        byte[] token = new byte[n];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(token);
+        }
+
+        string base64 = Convert.ToBase64String(token);
+
+        string urlSafe = base64
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .TrimEnd('=');
+
+        return urlSafe;
+    }
+
+    public string Sha256Hash(string input)
+    {
+        using (SHA256 sha256 = SHA256.Create())
+        {
+            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
+
+            byte[] hashBytes = sha256.ComputeHash(inputBytes);
+
+            return Convert.ToBase64String(hashBytes);
+        }
+    }
+
     public string HashPassword(string password)
     {
         byte[] saltBytes = new byte[16];

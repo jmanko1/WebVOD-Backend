@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Services.Interfaces;
@@ -52,6 +54,26 @@ public class AuthController : ControllerBase
         {
             await _authService.Register(registerDto);
             return StatusCode(201);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [HttpPost("Reset-Password")]
+    public async Task<ActionResult> InitiateResetPassword(
+        [FromBody]
+        [Required(ErrorMessage = "Podaj adres email.")]
+        [EmailAddress(ErrorMessage = "Podaj prawidłowy adres email.")]
+        [MaxLength(80, ErrorMessage = "Adres email może mieć maksymalnie 80 znaków.")]
+        string email
+    )
+    {
+        try
+        {
+            await _authService.InitiateResetPassword(email);
+            return Ok("Wysłano maila z linkiem resetującym hasło na adres " + email);
         }
         catch (RequestErrorException ex)
         {

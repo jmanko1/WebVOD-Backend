@@ -11,6 +11,7 @@ public static class ReposLayerExtension
         services.AddScoped<IFailedLoginLogRepository, FailedLoginLogRepository>();
         services.AddScoped<IUserBlockadeRepository, UserBlockadeRepository>();
         services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
+        services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>();
 
         return services;
     }

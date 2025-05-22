@@ -16,6 +16,7 @@ public class UserBlockadeRepository : IUserBlockadeRepository
         var database = client.GetDatabase(settings.Value.DbName);
         _userBlockades = database.GetCollection<UserBlockade>("UserBlockades");
     }
+
     public async Task Add(UserBlockade userBlockade)
     {
         await _userBlockades.InsertOneAsync(userBlockade);

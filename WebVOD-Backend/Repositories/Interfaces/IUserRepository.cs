@@ -10,4 +10,5 @@ public interface IUserRepository
     Task<bool> ExistsByEmail(string email);
     Task<User> FindByLogin(string login);
     Task<User> FindById(string id);
+    Task<User> FindByEmail(string email);
 }

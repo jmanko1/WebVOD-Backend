@@ -15,8 +15,9 @@ public class AuthService : IAuthService
     private readonly ICryptoService _cryptoService;
     private readonly IJwtService _jwtService;
     private readonly IUserDeviceRepository _userDeviceRepository;
+    private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
 
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IUserDeviceRepository userDeviceRepository)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IUserDeviceRepository userDeviceRepository, IResetPasswordTokenRepository resetPasswordTokenRepository)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
@@ -24,6 +25,7 @@ public class AuthService : IAuthService
         _cryptoService = cryptoService;
         _jwtService = jwtService;
         _userDeviceRepository = userDeviceRepository;
+        _resetPasswordTokenRepository = resetPasswordTokenRepository;
     }
 
     public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest)
@@ -255,5 +257,40 @@ public class AuthService : IAuthService
     {
         var totp = new Totp(Base32Encoding.ToBytes(secret));
         return totp.VerifyTotp(userInput, out _, new VerificationWindow(previous: 1, future: 1));
+    }
+
+    public async Task InitiateResetPassword(string email)
+    {
+        var user = await _userRepository.FindByEmail(email);
+        if(user == null)
+        {
+            throw new RequestErrorException(401, "Podany adres email nie jest zarejestrowany.");
+        }
+
+        await _resetPasswordTokenRepository.RemoveByUserId(user.Id);
+
+        var token = _cryptoService.GenerateResetPasswordToken(155);
+        Console.WriteLine(token);
+        var resetPasswordToken = new ResetPasswordToken
+        {
+            UserId = user.Id,
+            Token = _cryptoService.Sha256Hash(token)
+        };
+
+        await _resetPasswordTokenRepository.Add(resetPasswordToken);
+    }
+
+    public async Task ResetPassword(ResetPasswordDto resetPasswordDto)
+    {
+        var resetPasswordToken = await _resetPasswordTokenRepository.FindByToken(resetPasswordDto.Token);
+        if(resetPasswordToken == null)
+        {
+            throw new RequestErrorException(401, "Nieprawidłowy token.");
+        }
+
+        if(resetPasswordToken.ValidUntil < DateTime.Now)
+        {
+            throw new RequestErrorException(401, "Token wygasł.");
+        }
     }
 }

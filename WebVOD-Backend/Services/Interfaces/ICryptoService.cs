@@ -6,4 +6,7 @@ public interface ICryptoService
     string Decrypt(string encryptedText);
     string HashPassword(string password);
     bool VerifyPassword(string inputPassword, string hashedPassword);
+    string GenerateResetPasswordToken(int n);
+    string Sha256Hash(string input);
+
 }
