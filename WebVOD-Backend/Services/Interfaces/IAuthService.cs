@@ -8,5 +8,5 @@ public interface IAuthService
     Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest);
     Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest);
     Task InitiateResetPassword(string email);
-    Task ResetPassword(string token);
+    Task ResetPassword(ResetPasswordDto resetPasswordDto);
 }

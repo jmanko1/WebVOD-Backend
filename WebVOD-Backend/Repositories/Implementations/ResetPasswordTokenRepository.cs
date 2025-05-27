@@ -28,6 +28,12 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         return await _resetPasswordTokens.Find(filter).FirstOrDefaultAsync();
     }
 
+    public async Task RemoveById(string id)
+    {
+        var filter = Builders<ResetPasswordToken>.Filter.Eq(t => t.Id, id);
+        await _resetPasswordTokens.DeleteOneAsync(filter);
+    }
+
     public async Task RemoveByUserId(string userId)
     {
         var filter = Builders<ResetPasswordToken>.Filter.Eq(t => t.UserId, userId);

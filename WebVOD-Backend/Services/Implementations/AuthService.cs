@@ -282,15 +282,28 @@ public class AuthService : IAuthService
 
     public async Task ResetPassword(ResetPasswordDto resetPasswordDto)
     {
-        var resetPasswordToken = await _resetPasswordTokenRepository.FindByToken(resetPasswordDto.Token);
+        var sha256Token = _cryptoService.Sha256Hash(resetPasswordDto.Token);
+        var resetPasswordToken = await _resetPasswordTokenRepository.FindByToken(sha256Token);
         if(resetPasswordToken == null)
         {
             throw new RequestErrorException(401, "Nieprawidłowy token.");
         }
 
-        if(resetPasswordToken.ValidUntil < DateTime.Now)
+        if(resetPasswordToken.ValidUntil < DateTime.UtcNow)
         {
-            throw new RequestErrorException(401, "Token wygasł.");
+            await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
+            throw new RequestErrorException(401, "Token wygasł. Rozpocznij od nowa proces resetowania hasła.");
         }
+
+        var userExists = await _userRepository.ExistsById(resetPasswordToken.UserId);
+        if(!userExists)
+        {
+            await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
+            throw new RequestErrorException(401, "Nieprawidłowy token.");
+        }
+
+        var newPassword = _cryptoService.HashPassword(resetPasswordDto.Password);
+        await _userRepository.ChangePassword(resetPasswordToken.UserId, newPassword);
+        await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
     }
 }

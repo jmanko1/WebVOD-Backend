@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
@@ -34,7 +33,12 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("Login/Code")]
-    public async Task<ActionResult<LoginResponseDto>> Code([FromBody] string code)
+    public async Task<ActionResult<LoginResponseDto>> Code(
+        [FromBody]
+        [Required(ErrorMessage = "Podaj kod.")]
+        [RegularExpression("^[0-9]{6}$", ErrorMessage = "Podaj prawidłowy 6-cyfrowy kod.")]
+        string code
+    )
     {
         try
         {
@@ -73,7 +77,21 @@ public class AuthController : ControllerBase
         try
         {
             await _authService.InitiateResetPassword(email);
-            return Ok("Wysłano maila z linkiem resetującym hasło na adres " + email);
+            return Ok("Wysłano maila z linkiem resetującym hasło na adres " + email + ".");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [HttpPut("Reset-Password/Complete")]
+    public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
+    {
+        try
+        {
+            await _authService.ResetPassword(resetPasswordDto);
+            return Ok("Hasło zostało zresetowane.");
         }
         catch (RequestErrorException ex)
         {

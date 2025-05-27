@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using DnsClient;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
 using WebVOD_Backend.Model;
@@ -55,5 +56,20 @@ public class UserRepository : IUserRepository
     public async Task<List<User>> GetAll()
     {
         return await _users.Find(_ => true).ToListAsync();
+    }
+
+    public async Task<bool> ExistsById(string id)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, id);
+        return await _users.Find(filter).AnyAsync();
+    }
+
+    public async Task ChangePassword(string userId, string newPassword)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update
+            .Set(u => u.Password, newPassword);
+
+        await _users.UpdateOneAsync(filter, update);
     }
 }
