@@ -1,4 +1,5 @@
 using WebVOD_Backend.Config;
+using WebVOD_Backend.Controllers;
 using WebVOD_Backend.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +35,8 @@ builder.Services.AddSession(options =>
 
 builder.Services.AddDistributedMemoryCache();
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -43,12 +46,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowClient");
-
 app.UseSession();
 
 app.UseAuthorization();
 app.UseAuthentication();
 
 app.MapControllers();
+app.MapHub<WatchTogetherHub>("/watch-together");
 
 app.Run();
