@@ -2,6 +2,6 @@
 
 public interface IJwtService
 {
-    string GenerateJwtToken(string userId);
+    string GenerateJwtToken(string login);
     int GetExpiresIn();
 }

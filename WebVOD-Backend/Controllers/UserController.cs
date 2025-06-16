@@ -1,4 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using WebVOD_Backend.Dtos.User;
+using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
 using WebVOD_Backend.Services.Interfaces;
 
@@ -13,6 +17,41 @@ public class UserController : ControllerBase
     public UserController(IUserService userService)
     {
         _userService = userService;
+    }
+
+    [HttpGet("{login}")]
+    public async Task<ActionResult<UserDto>> GetUserByLogin(string login)
+    {
+        try
+        {
+            var user = await _userService.GetUserByLogin(login);
+            return Ok(user);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("my-profile")]
+    public async Task<ActionResult<UserDto>> GetMyProfile()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var user = await _userService.GetMyProfile(sub);
+            return Ok(user);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
     }
 
     [HttpGet]
