@@ -9,32 +9,33 @@ namespace WebVOD_Backend.Services.Implementations;
 public class JwtService : IJwtService
 {
     private readonly IConfiguration _configuration;
+    private IConfigurationSection JwtSettings => _configuration.GetSection("JwtSettings");
+
 
     public JwtService(IConfiguration configuration)
     {
         _configuration = configuration;
     }
 
-    public string GenerateJwtToken(string userId)
+    public string GenerateJwtToken(string login)
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
-        var lifetime = jwtSettings.GetValue<int>("Lifetime");
+        var secretKey = Encoding.UTF8.GetBytes(JwtSettings["SecretKey"]);
+        var lifetime = JwtSettings.GetValue<int>("Lifetime");
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, login),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+            new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
 
         var credentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
+            issuer: JwtSettings["Issuer"],
+            audience: JwtSettings["Audience"],
             claims: claims,
-            expires: DateTime.Now.AddMinutes(lifetime),
+            expires: DateTime.UtcNow.AddMinutes(lifetime),
             signingCredentials: credentials
         );
 
@@ -43,8 +44,7 @@ public class JwtService : IJwtService
 
     public int GetExpiresIn()
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var lifetime = jwtSettings.GetValue<int>("Lifetime");
+        var lifetime = JwtSettings.GetValue<int>("Lifetime");
 
         return lifetime;
     }

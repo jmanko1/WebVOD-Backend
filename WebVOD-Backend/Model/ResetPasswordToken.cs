@@ -17,8 +17,8 @@ public class ResetPasswordToken
     public string UserId { get; set; }
 
     [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Required]
-    public DateTime ValidUntil { get; set; } = DateTime.Now.AddMinutes(10);
+    public DateTime ValidUntil { get; set; } = DateTime.UtcNow.AddMinutes(15);
 }

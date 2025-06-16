@@ -26,7 +26,7 @@ public class UserBlockadeRepository : IUserBlockadeRepository
     {
         var builder = Builders<UserBlockade>.Filter;
         var filter = builder.Eq(b => b.UserId, userId) &
-                     builder.Gt(b => b.Until, DateTime.Now);
+                     builder.Gt(b => b.Until, DateTime.UtcNow);
 
         return await _userBlockades.Find(filter).AnyAsync();
     }

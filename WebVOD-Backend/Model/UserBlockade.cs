@@ -14,8 +14,8 @@ public class UserBlockade
     public string UserId { get; set; }
 
     [Required]
-    public DateTime Since { get; set; } = DateTime.Now;
+    public DateTime Since { get; set; } = DateTime.UtcNow;
 
     [Required]
-    public DateTime Until { get; set; } = DateTime.Now.AddMinutes(10);
+    public DateTime Until { get; set; } = DateTime.UtcNow.AddMinutes(10);
 }

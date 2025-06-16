@@ -20,5 +20,5 @@ public class FailedLoginLog
     public string SourceDevice { get; set; }
 
     [Required]
-    public DateTime LogAt { get; set; } = DateTime.Now;
+    public DateTime LogAt { get; set; } = DateTime.UtcNow;
 }

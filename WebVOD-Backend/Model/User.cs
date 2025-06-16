@@ -30,18 +30,8 @@ public class User
     public bool IsTFAEnabled { get; set; } = false;
 
     [Required]
-    [BsonRepresentation(BsonType.String)]
-    public TFAMethod TFAMethod { get; set; } = TFAMethod.ALWAYS;
-
-    [Required]
     public string TOTPKey { get; set; }
 
     [Required]
-    public DateTime SignupDate { get; set; } = DateTime.Now;
-}
-
-public enum TFAMethod
-{
-    ALWAYS,
-    NEW_DEVICE
+    public DateTime SignupDate { get; set; } = DateTime.UtcNow;
 }

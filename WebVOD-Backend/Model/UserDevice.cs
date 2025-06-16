@@ -17,11 +17,11 @@ public class UserDevice
     public string UserId { get; set; }
 
     [Required]
-    public DateTime LastLoginAt { get; set; } = DateTime.Now;
+    public DateTime LastLoginAt { get; set; } = DateTime.UtcNow;
 
     [Required]
-    public DateTime RegisteredAt { get; set; } = DateTime.Now;
+    public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
 
     [Required]
-    public DateTime ValidUntil { get; set; } = DateTime.Now.AddDays(90);
+    public DateTime ValidUntil { get; set; } = DateTime.UtcNow.AddDays(90);
 }
