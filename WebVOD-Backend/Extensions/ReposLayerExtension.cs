@@ -10,7 +10,7 @@ public static class ReposLayerExtension
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IFailedLoginLogRepository, FailedLoginLogRepository>();
         services.AddScoped<IUserBlockadeRepository, UserBlockadeRepository>();
-        services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
+        //services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
         services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>();
 
         return services;

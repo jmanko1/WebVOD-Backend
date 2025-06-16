@@ -48,8 +48,8 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowClient");
 app.UseSession();
 
-app.UseAuthorization();
 app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<WatchTogetherHub>("/watch-together");

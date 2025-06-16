@@ -14,17 +14,15 @@ public class AuthService : IAuthService
     private readonly IUserBlockadeRepository _blockadeRepository;
     private readonly ICryptoService _cryptoService;
     private readonly IJwtService _jwtService;
-    private readonly IUserDeviceRepository _userDeviceRepository;
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
 
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IUserDeviceRepository userDeviceRepository, IResetPasswordTokenRepository resetPasswordTokenRepository)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
         _blockadeRepository = blockadeRepository;
         _cryptoService = cryptoService;
         _jwtService = jwtService;
-        _userDeviceRepository = userDeviceRepository;
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
     }
 
@@ -42,24 +40,14 @@ public class AuthService : IAuthService
             await HandleFailedLogin(user.Id, sourceIP, sourceDevice);
             throw new RequestErrorException(401, "Niepoprawny login lub hasło.");
         }
-
-        var savedDevice = await _userDeviceRepository.FindByNameAndUserId(sourceDevice, user.Id);
-
+        
         if (!user.IsTFAEnabled)
         {
-            await HandleTrustedDevice(savedDevice, sourceDevice, user.Id);
-            return GenerateLoginResponse(user.Id);
+            return GenerateLoginResponse(user.Login);
         }
 
-        if (IsTfaRequired(user, savedDevice))
-        {
-            SaveTfaSession(httpContext, user.Id);
-            return GenerateTFAResponse();
-        }
-
-        await _userDeviceRepository.UpdateLastLoginAt(savedDevice.Id, DateTime.Now);
-
-        return GenerateLoginResponse(user.Id);
+        SaveTfaSession(httpContext, user.Id);
+        return GenerateTFAResponse();
     }
 
     private async Task<User> GetUserByLoginSecurely(string login, string password)
@@ -107,45 +95,16 @@ public class AuthService : IAuthService
         }
     }
 
-    private async Task HandleTrustedDevice(UserDevice? savedDevice, string deviceName, string userId, bool updateValidationDates = false)
-    {
-        if (savedDevice == null)
-        {
-            var newDevice = new UserDevice
-            {
-                Name = deviceName,
-                UserId = userId
-            };
-
-            await _userDeviceRepository.Add(newDevice);
-        }
-        else
-        {
-            if(updateValidationDates && savedDevice.ValidUntil < DateTime.Now)
-                await _userDeviceRepository.UpdateDates(savedDevice.Id, DateTime.Now, DateTime.Now.AddDays(90));
-
-            await _userDeviceRepository.UpdateLastLoginAt(savedDevice.Id, DateTime.Now);
-        }
-    }
-
-    private bool IsTfaRequired(User user, UserDevice? savedDevice)
-    {
-        if (user.TFAMethod == TFAMethod.ALWAYS)
-            return true;
-
-        return savedDevice == null || savedDevice.ValidUntil < DateTime.Now;
-    }
-
     private void SaveTfaSession(HttpContext context, string userId)
     {
         context.Session.SetString("auth_userId", userId);
-        context.Session.SetString("auth_dateUntil", DateTime.Now.AddMinutes(5).ToString());
+        context.Session.SetString("auth_dateUntil", DateTime.UtcNow.AddMinutes(5).ToString());
         context.Session.SetInt32("auth_attempts", 0);
     }
 
-    private LoginResponseDto GenerateLoginResponse(string userId)
+    private LoginResponseDto GenerateLoginResponse(string login)
     {
-        var token = _jwtService.GenerateJwtToken(userId);
+        var token = _jwtService.GenerateJwtToken(login);
         return new LoginResponseDto
         {
             Token = token,
@@ -199,7 +158,7 @@ public class AuthService : IAuthService
 
         if (DateTime.TryParse(dateUntil, out DateTime result))
         {
-            if(result < DateTime.Now)
+            if(result < DateTime.UtcNow)
             {
                 throw new RequestErrorException(401, "Czas na podanie kodu minął. Rozpocznij proces logowania od nowa.");
             }
@@ -240,10 +199,7 @@ public class AuthService : IAuthService
 
         ClearTfaSession(httpContext);
 
-        var savedDevice = await _userDeviceRepository.FindByNameAndUserId(sourceDevice, user.Id);
-        await HandleTrustedDevice(savedDevice, sourceDevice, user.Id, updateValidationDates: true);
-
-        return GenerateLoginResponse(user.Id);
+        return GenerateLoginResponse(user.Login);
     }
 
     private void ClearTfaSession(HttpContext context)
