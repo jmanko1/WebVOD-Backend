@@ -22,7 +22,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var response = await _authService.Authenticate(loginDto, HttpContext, Request);
+            var response = await _authService.Authenticate(loginDto, HttpContext, Request, Response);
 
             return Ok(response);
         }
@@ -42,12 +42,28 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var response = await _authService.Code(code, HttpContext, Request);
+            var response = await _authService.Code(code, HttpContext, Request, Response);
             return Ok(response);
         }
         catch (RequestErrorException ex)
         {
             return StatusCode(ex.StatusCode, new { ex.Message});
+        }
+    }
+
+    [HttpPost("Refresh")]
+    public async Task<ActionResult<LoginResponseDto>> Refresh()
+    {
+        var refreshToken = Request.Cookies["refreshToken"];
+
+        try
+        {
+            var response = await _authService.Refresh(refreshToken);
+            return Ok(response);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
         }
     }
 

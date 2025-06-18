@@ -17,10 +17,10 @@ public class JwtService : IJwtService
         _configuration = configuration;
     }
 
-    public string GenerateJwtToken(string login)
+    public string GenerateAccessToken(string login)
     {
         var secretKey = Encoding.UTF8.GetBytes(JwtSettings["SecretKey"]);
-        var lifetime = JwtSettings.GetValue<int>("Lifetime");
+        var lifetime = JwtSettings.GetValue<int>("AccessTokenLifetime");
 
         var claims = new[]
         {
@@ -42,10 +42,78 @@ public class JwtService : IJwtService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    public int GetExpiresIn()
+    public int GetAccessTokenLifetime()
     {
-        var lifetime = JwtSettings.GetValue<int>("Lifetime");
+        var lifetime = JwtSettings.GetValue<int>("AccessTokenLifetime");
 
         return lifetime;
     }
+
+    public string GenerateRefreshToken(string login)
+    {
+        var secretKey = Encoding.UTF8.GetBytes(JwtSettings["SecretKey"]);
+        var lifetime = JwtSettings.GetValue<int>("RefreshTokenLifetime");
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, login),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new Claim("type", "refresh")
+        };
+
+        var credentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: JwtSettings["Issuer"],
+            audience: JwtSettings["Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(lifetime),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public int GetRefreshTokenLifetime()
+    {
+        var lifetime = JwtSettings.GetValue<int>("RefreshTokenLifetime");
+
+        return lifetime;
+    }
+
+    public ClaimsPrincipal? ValidateRefreshToken(string refreshToken)
+    {
+        var secretKey = Encoding.UTF8.GetBytes(JwtSettings["SecretKey"]);
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = JwtSettings["Issuer"],
+            ValidAudience = JwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(secretKey)
+        };
+
+        try
+        {
+            var principal = tokenHandler.ValidateToken(refreshToken, validationParameters, out SecurityToken validatedToken);
+
+            var tokenType = principal.FindFirst("type")?.Value;
+            if (tokenType != null && tokenType != "refresh")
+            {
+                return null;
+            }
+
+            return principal;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
 }

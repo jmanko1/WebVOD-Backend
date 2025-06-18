@@ -17,4 +17,6 @@ public class LoginDto
         ErrorMessage = "Hasło musi zawierać co najmniej jedną małą literę, jedną wielką literę, jedną cyfrę oraz jeden znak specjalny."
     )]
     public string Password { get; set; }
+
+    public bool CheckedSave { get; set; }
 }

@@ -1,4 +1,6 @@
-﻿using OtpNet;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using OtpNet;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
@@ -16,6 +18,12 @@ public class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
 
+    private const int MaxTimeSpanMinutes = 1;
+    private const int MaxFailedAttempts = 5;
+    private const int TFASessionLifetime = 5;
+    private const int MaxTFACodeAttempts = 2;
+
+
     public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository)
     {
         _userRepository = userRepository;
@@ -26,7 +34,7 @@ public class AuthService : IAuthService
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
     }
 
-    public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest)
+    public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
     {
         var user = await GetUserByLoginSecurely(loginDto.Login, loginDto.Password);
 
@@ -43,11 +51,27 @@ public class AuthService : IAuthService
         
         if (!user.IsTFAEnabled)
         {
+            if(loginDto.CheckedSave)
+            {
+                SaveRefreshTokenCookie(httpResponse, user.Login);
+            }
+
             return GenerateLoginResponse(user.Login);
         }
 
-        SaveTfaSession(httpContext, user.Id);
+        SaveTfaSession(httpContext, user.Id, loginDto.CheckedSave);
         return GenerateTFAResponse();
+    }
+
+    private void SaveRefreshTokenCookie(HttpResponse httpResponse, string login)
+    {
+        var refreshToken = _jwtService.GenerateRefreshToken(login);
+        httpResponse.Cookies.Append("refreshToken", refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.UtcNow.AddDays(_jwtService.GetRefreshTokenLifetime())
+        });
     }
 
     private async Task<User> GetUserByLoginSecurely(string login, string password)
@@ -83,8 +107,8 @@ public class AuthService : IAuthService
 
         await _failedLoginLogRepository.Add(log);
 
-        var failedAttempts = await _failedLoginLogRepository.CountFailedAttempts(ip, userId, TimeSpan.FromMinutes(1));
-        if (failedAttempts >= 5)
+        var failedAttempts = await _failedLoginLogRepository.CountFailedAttempts(ip, userId, TimeSpan.FromMinutes(MaxTimeSpanMinutes));
+        if (failedAttempts >= MaxFailedAttempts)
         {
             var blockade = new UserBlockade
             {
@@ -95,20 +119,21 @@ public class AuthService : IAuthService
         }
     }
 
-    private void SaveTfaSession(HttpContext context, string userId)
+    private void SaveTfaSession(HttpContext context, string userId, bool checkedSave)
     {
         context.Session.SetString("auth_userId", userId);
-        context.Session.SetString("auth_dateUntil", DateTime.UtcNow.AddMinutes(5).ToString());
+        context.Session.SetString("auth_dateUntil", DateTime.UtcNow.AddMinutes(TFASessionLifetime).ToString());
         context.Session.SetInt32("auth_attempts", 0);
+        context.Session.SetInt32("auth_checkedSave", checkedSave ? 1 : 0);
     }
 
     private LoginResponseDto GenerateLoginResponse(string login)
     {
-        var token = _jwtService.GenerateJwtToken(login);
+        var token = _jwtService.GenerateAccessToken(login);
         return new LoginResponseDto
         {
             Token = token,
-            ExpiresIn = _jwtService.GetExpiresIn(),
+            ExpiresIn = _jwtService.GetAccessTokenLifetime(),
             TFARequired = false
         };
     }
@@ -146,7 +171,7 @@ public class AuthService : IAuthService
         await _userRepository.Add(user);
     }
 
-    public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest)
+    public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
     {
         var userId = httpContext.Session.GetString("auth_userId");
         if (userId == null)
@@ -184,7 +209,7 @@ public class AuthService : IAuthService
         if (!ValidateTotp(secretKey, code))
         {
             var attempts = (int)httpContext.Session.GetInt32("auth_attempts") + 1;
-            if(attempts >= 2)
+            if(attempts >= MaxTFACodeAttempts)
             {
                 ClearTfaSession(httpContext);
 
@@ -197,6 +222,11 @@ public class AuthService : IAuthService
             throw new RequestErrorException(401, "Niepoprawny kod.");
         }
 
+        if(httpContext.Session.GetInt32("auth_checkedSave") == 1)
+        {
+            SaveRefreshTokenCookie(httpResponse, user.Login);
+        }
+
         ClearTfaSession(httpContext);
 
         return GenerateLoginResponse(user.Login);
@@ -207,6 +237,7 @@ public class AuthService : IAuthService
         context.Session.Remove("auth_userId");
         context.Session.Remove("auth_dateUntil");
         context.Session.Remove("auth_attempts");
+        context.Session.Remove("auth_checkedSave");
     }
 
     private bool ValidateTotp(string secret, string userInput)
@@ -261,5 +292,33 @@ public class AuthService : IAuthService
         var newPassword = _cryptoService.HashPassword(resetPasswordDto.Password);
         await _userRepository.ChangePassword(resetPasswordToken.UserId, newPassword);
         await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
+    }
+
+    public async Task<LoginResponseDto> Refresh(string refreshToken)
+    {
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            throw new RequestErrorException(401, "Brak tokenu.");
+        }
+
+        var principal = _jwtService.ValidateRefreshToken(refreshToken);
+        if (principal == null)
+        {
+            throw new RequestErrorException(401, "Nieprawidłowy token.");
+        }
+
+        var login = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(login))
+        {
+            throw new RequestErrorException(401, "Nieprawidłowy token.");
+        }
+
+        var userExists = await _userRepository.ExistsByLogin(login);
+        if (!userExists)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        return GenerateLoginResponse(login);
     }
 }
