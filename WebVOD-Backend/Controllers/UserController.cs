@@ -54,6 +54,27 @@ public class UserController : ControllerBase
         }
     }
 
+    [Authorize]
+    [HttpGet("my-profile/email")]
+    public async Task<ActionResult<string>> GetMyEmail()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var email = await _userService.GetMyEmail(sub);
+            return Ok(email);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<User>>> GetAll()
     {

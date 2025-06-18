@@ -55,4 +55,15 @@ public class UserService : IUserService
 
         return userDto;
     }
+
+    public async Task<string> GetMyEmail(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if(user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        return user.Email;
+    }
 }

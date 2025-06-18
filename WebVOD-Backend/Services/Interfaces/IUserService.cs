@@ -7,5 +7,6 @@ public interface IUserService
 {
     Task<UserDto> GetUserByLogin(string login);
     Task<UserDto> GetMyProfile(string sub);
+    Task<string> GetMyEmail(string sub);
     Task<List<User>> GetAll();
 }
