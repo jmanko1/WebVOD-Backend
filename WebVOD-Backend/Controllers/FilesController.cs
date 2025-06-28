@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using WebVOD_Backend.Exceptions;
+using WebVOD_Backend.Services.Interfaces;
 
 namespace WebVOD_Backend.Controllers;
 
@@ -6,30 +8,24 @@ namespace WebVOD_Backend.Controllers;
 [Route("/uploads")]
 public class FilesController : ControllerBase
 {
-    private readonly string filesDirectory = "G:\\z\\WebVOD";
+    private readonly IFilesService _filesService;
+
+    public FilesController(IFilesService filesService)
+    {
+        _filesService = filesService;
+    }
 
     [HttpGet("{*fileName}")]
     public IActionResult GetFile(string fileName)
     {
-        if (string.IsNullOrEmpty(fileName))
-            return BadRequest("Nie podano nazwy pliku.");
-
-        var filePath = Path.GetFullPath(Path.Combine(filesDirectory, fileName));
-
-        if (!filePath.StartsWith(filesDirectory, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return BadRequest();
+            var file = _filesService.GetFile(fileName);
+            return file;
         }
-
-        if (!System.IO.File.Exists(filePath))
+        catch (RequestErrorException ex)
         {
-            return NotFound();
+            return StatusCode(ex.StatusCode, new { ex.Message });
         }
-
-        var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var contentType = "application/octet-stream";
-        var downloadName = Path.GetFileName(filePath);
-
-        return File(stream, contentType, downloadName);
     }
 }

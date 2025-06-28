@@ -11,6 +11,7 @@ public static class ServicesLayerExtension
         services.AddScoped<ICryptoService, CryptoService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IJwtService, JwtService>();
+        services.AddScoped<IFilesService, FilesService>();
 
         return services;
     }
