@@ -13,4 +13,6 @@ public interface IUserRepository
     Task<User> FindById(string id);
     Task<User> FindByEmail(string email);
     Task ChangePassword(string userId, string newPassword);
+    Task UpdateDescription(string userId, string description);
+    Task UpdateImageUrl(string userId, string imageUrl);
 }

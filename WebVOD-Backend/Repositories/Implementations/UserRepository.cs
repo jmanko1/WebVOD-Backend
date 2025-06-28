@@ -72,4 +72,22 @@ public class UserRepository : IUserRepository
 
         await _users.UpdateOneAsync(filter, update);
     }
+
+    public async Task UpdateDescription(string userId, string description)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update
+            .Set(u => u.Description, description);
+
+        await _users.UpdateOneAsync(filter, update);
+    }
+
+    public async Task UpdateImageUrl(string userId, string imageUrl)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update
+            .Set(u => u.ImageUrl, imageUrl);
+
+        await _users.UpdateOneAsync(filter, update);
+    }
 }

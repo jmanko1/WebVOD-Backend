@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.User;
@@ -68,6 +69,54 @@ public class UserController : ControllerBase
         {
             var email = await _userService.GetMyEmail(sub);
             return Ok(email);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("my-profile/description")]
+    public async Task<ActionResult<string>> UpdateDescription(
+        [FromBody]
+        [Required(ErrorMessage = "Podaj opis.")]
+        [MaxLength(1500, ErrorMessage = "Opis kanału może mieć maksymalnie 1500 znaków.")]
+        string description
+    )
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.UpdateDescription(sub, description);
+            return Ok("Opis kanału został zaktualizowany.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("my-profile/image")]
+    [RequestSizeLimit(1048576)] // 1 MB
+    public async Task<ActionResult<string>> UpdateImage([FromForm] IFormFile image)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var imageUrl = await _userService.UpdateImage(sub, image);
+            return Ok(imageUrl);
         }
         catch (RequestErrorException ex)
         {
