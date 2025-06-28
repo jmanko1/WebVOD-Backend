@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
@@ -113,5 +114,15 @@ public class AuthController : ControllerBase
         {
             return StatusCode(ex.StatusCode, new { ex.Message });
         }
+    }
+
+    [Authorize]
+    [HttpPost("Logout")]
+    public ActionResult Logout()
+    {
+        //TODO: Unieważnić jwt access token użytkownika
+        //TODO: Oprócz usunięcia ciasteczka z jwt refresh token, unieważnić również ten refresh token użytkownika, jeśli istnieje
+        Response.Cookies.Delete("refreshToken");
+        return Ok("Wylogowano.");
     }
 }
