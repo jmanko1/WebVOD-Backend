@@ -243,7 +243,7 @@ public class AuthService : IAuthService
     private bool ValidateTotp(string secret, string userInput)
     {
         var totp = new Totp(Base32Encoding.ToBytes(secret));
-        return totp.VerifyTotp(userInput, out _, new VerificationWindow(previous: 1, future: 1));
+        return totp.VerifyTotp(userInput, out _, new VerificationWindow(previous: 1, future: 0));
     }
 
     public async Task InitiateResetPassword(string email)
