@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using System.Text.RegularExpressions;
+using OtpNet;
 using WebVOD_Backend.Dtos.User;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
@@ -11,11 +12,13 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IFilesService _filesService;
+    private readonly ICryptoService _cryptoService;
 
-    public UserService(IUserRepository userRepository, IFilesService filesService)
+    public UserService(IUserRepository userRepository, IFilesService filesService, ICryptoService cryptoService)
     {
         _userRepository = userRepository;
         _filesService = filesService;
+        _cryptoService = cryptoService;
     }
 
     public async Task<UserDto> GetMyProfile(string sub)
@@ -123,5 +126,98 @@ public class UserService : IUserService
         await _userRepository.UpdateImageUrl(user.Id, imageUrl);
 
         return imageUrl;
+    }
+
+    public async Task<bool> IsTFARequired(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        return user.IsTFAEnabled;
+    }
+
+    public async Task ChangePassword(string sub, ChangePasswordDto changePasswordDto)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!_cryptoService.VerifyPassword(changePasswordDto.OldPassword, user.Password))
+        {
+            throw new RequestErrorException(401, "Nieprawidłowe stare hasło.");
+        }
+
+        if (user.IsTFAEnabled)
+        {
+            if (changePasswordDto.Code == null)
+            {
+                throw new RequestErrorException(400, "Podaj kod.");
+            }
+
+            var regex = "^[0-9]{6}$";
+            if (!Regex.IsMatch(changePasswordDto.Code, regex))
+            {
+                throw new RequestErrorException(400, "Podaj prawidłowy 6-cyfrowy kod.");
+            }
+
+            var secretKey = _cryptoService.Decrypt(user.TOTPKey);
+            if (!ValidateTotp(secretKey, changePasswordDto.Code))
+            {
+                throw new RequestErrorException(401, "Nieprawidłowy kod.");
+            }
+
+            await _userRepository.ChangePassword(user.Id, _cryptoService.HashPassword(changePasswordDto.NewPassword));
+            return;
+        }
+
+        await _userRepository.ChangePassword(user.Id, _cryptoService.HashPassword(changePasswordDto.NewPassword));
+    }
+    private bool ValidateTotp(string secret, string userInput)
+    {
+        var totp = new Totp(Base32Encoding.ToBytes(secret));
+        return totp.VerifyTotp(userInput, out _, new VerificationWindow(previous: 1, future: 0));
+    }
+
+    public async Task<string?> GetTFAQrCode(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (user.IsTFAEnabled)
+            return null;
+
+        var secret = _cryptoService.Decrypt(user.TOTPKey);
+
+        return $"otpauth://totp/webvod:{user.Login}?secret={secret}&issuer=webvod&algorithm=SHA1&digits=6&period=30";
+    }
+
+    public async Task ToggleTFA(string sub, ToggleTFADto toggleTFADto)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!_cryptoService.VerifyPassword(toggleTFADto.Password, user.Password))
+        {
+            throw new RequestErrorException(401, "Nieprawidłowe hasło.");
+        }
+
+        var secretKey = _cryptoService.Decrypt(user.TOTPKey);
+        if (!ValidateTotp(secretKey, toggleTFADto.Code))
+        {
+            throw new RequestErrorException(401, "Nieprawidłowy kod.");
+        }
+
+        await _userRepository.SetTFA(user.Id, !user.IsTFAEnabled);
     }
 }

@@ -10,5 +10,9 @@ public interface IUserService
     Task<string> GetMyEmail(string sub);
     Task UpdateDescription(string sub, string description);
     Task<string> UpdateImage(string sub, IFormFile image);
+    Task<bool> IsTFARequired(string sub);
+    Task ChangePassword(string sub, ChangePasswordDto changePasswordDto);
+    Task<string?> GetTFAQrCode(string sub);
+    Task ToggleTFA(string sub, ToggleTFADto toggleTFADto);
     Task<List<User>> GetAll();
 }

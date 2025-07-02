@@ -81,7 +81,7 @@ public class UserController : ControllerBase
     public async Task<ActionResult<string>> UpdateDescription(
         [FromBody]
         [Required(ErrorMessage = "Podaj opis.")]
-        [MaxLength(1500, ErrorMessage = "Opis kanału może mieć maksymalnie 1500 znaków.")]
+        [MaxLength(1000, ErrorMessage = "Opis kanału może mieć maksymalnie 1000 znaków.")]
         string description
     )
     {
@@ -117,6 +117,88 @@ public class UserController : ControllerBase
         {
             var imageUrl = await _userService.UpdateImage(sub, image);
             return Ok(imageUrl);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("my-profile/is-tfa-required")]
+    public async Task<ActionResult<bool>> IsTFARequired()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var isTFARequired = await _userService.IsTFARequired(sub);
+            return Ok(isTFARequired);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("my-profile/change-password")]
+    public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.ChangePassword(sub, changePasswordDto);
+            return Ok("Hasło zostało zmienione.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("my-profile/tfa-qr-code")]
+    public async Task<ActionResult> GetTFAQrCode()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _userService.GetTFAQrCode(sub);
+        if(result == null)
+        {
+            return NoContent();
+        }
+
+        return Ok(result);
+    }
+
+    [Authorize]
+    [HttpPut("my-profile/toggle-tfa")]
+    public async Task<ActionResult> ToggleTFA([FromBody] ToggleTFADto toggleTFADto)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.ToggleTFA(sub, toggleTFADto);
+            return Ok("Uwierzytelnianie dwuskładnikowe zostało skonfigurowane.");
         }
         catch (RequestErrorException ex)
         {

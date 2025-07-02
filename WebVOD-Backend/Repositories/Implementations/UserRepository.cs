@@ -1,5 +1,4 @@
-﻿using DnsClient;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
 using WebVOD_Backend.Model;
@@ -87,6 +86,15 @@ public class UserRepository : IUserRepository
         var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
         var update = Builders<User>.Update
             .Set(u => u.ImageUrl, imageUrl);
+
+        await _users.UpdateOneAsync(filter, update);
+    }
+
+    public async Task SetTFA(string userId, bool isTFAEnabled)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update
+            .Set(u => u.IsTFAEnabled, isTFAEnabled);
 
         await _users.UpdateOneAsync(filter, update);
     }

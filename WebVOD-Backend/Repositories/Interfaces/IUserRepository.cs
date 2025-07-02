@@ -15,4 +15,5 @@ public interface IUserRepository
     Task ChangePassword(string userId, string newPassword);
     Task UpdateDescription(string userId, string description);
     Task UpdateImageUrl(string userId, string imageUrl);
+    Task SetTFA(string userId, bool isTFAEnabled);
 }
