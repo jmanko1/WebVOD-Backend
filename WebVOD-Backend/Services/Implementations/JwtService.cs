@@ -1,7 +1,9 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Linq;
+using WebVOD_Backend.Repositories.Interfaces;
 using WebVOD_Backend.Services.Interfaces;
 
 namespace WebVOD_Backend.Services.Implementations;
@@ -10,11 +12,12 @@ public class JwtService : IJwtService
 {
     private readonly IConfiguration _configuration;
     private IConfigurationSection JwtSettings => _configuration.GetSection("JwtSettings");
+    private readonly IBlacklistedTokenRepository _blacklistedTokenRepository;
 
-
-    public JwtService(IConfiguration configuration)
+    public JwtService(IConfiguration configuration, IBlacklistedTokenRepository blacklistedTokenRepository)
     {
         _configuration = configuration;
+        _blacklistedTokenRepository = blacklistedTokenRepository;
     }
 
     public string GenerateAccessToken(string login)
@@ -82,7 +85,7 @@ public class JwtService : IJwtService
         return lifetime;
     }
 
-    public ClaimsPrincipal? ValidateRefreshToken(string refreshToken)
+    public async Task<ClaimsPrincipal?> ValidateRefreshToken(string refreshToken)
     {
         var secretKey = Encoding.UTF8.GetBytes(JwtSettings["SecretKey"]);
 
@@ -108,6 +111,17 @@ public class JwtService : IJwtService
                 return null;
             }
 
+            var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+            if (string.IsNullOrEmpty(jti))
+            {
+                return null;
+            }
+
+            if (await _blacklistedTokenRepository.ExistsByJti(jti))
+            {
+                return null;
+            }
+
             return principal;
         }
         catch
@@ -116,4 +130,22 @@ public class JwtService : IJwtService
         }
     }
 
+    public string? GetJti(string jwt)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(jwt);
+
+        var jti = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti)?.Value;
+
+        return jti;
+    }
+
+    public DateTime GetExpiresAt(string jwt)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(jwt);
+        var expires = jwtToken.ValidTo;
+
+        return expires;
+    }
 }

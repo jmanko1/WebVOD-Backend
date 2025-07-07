@@ -8,5 +8,7 @@ public interface IJwtService
     string GenerateRefreshToken(string login);
     int GetAccessTokenLifetime();
     int GetRefreshTokenLifetime();
-    ClaimsPrincipal? ValidateRefreshToken(string refreshToken);
+    string? GetJti(string jwt);
+    DateTime GetExpiresAt(string jwt);
+    Task<ClaimsPrincipal?> ValidateRefreshToken(string refreshToken);
 }

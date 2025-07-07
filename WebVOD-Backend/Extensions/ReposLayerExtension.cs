@@ -12,6 +12,10 @@ public static class ReposLayerExtension
         services.AddScoped<IUserBlockadeRepository, UserBlockadeRepository>();
         //services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
         services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>();
+        services.AddScoped<IVideoRepository, VideoRepository>();
+        services.AddScoped<ICommentRepository, CommentRepository>();
+        services.AddScoped<ILikeRepository, LikeRepository>();
+        services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
 
         return services;
     }

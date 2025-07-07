@@ -1,5 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using OtpNet;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
@@ -17,14 +16,14 @@ public class AuthService : IAuthService
     private readonly ICryptoService _cryptoService;
     private readonly IJwtService _jwtService;
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
+    private readonly IBlacklistedTokenRepository _blacklistedTokenRepository;
 
     private const int MaxTimeSpanMinutes = 1;
     private const int MaxFailedAttempts = 5;
     private const int TFASessionLifetime = 5;
     private const int MaxTFACodeAttempts = 2;
 
-
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
@@ -32,10 +31,13 @@ public class AuthService : IAuthService
         _cryptoService = cryptoService;
         _jwtService = jwtService;
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
+        _blacklistedTokenRepository = blacklistedTokenRepository;
     }
 
     public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
     {
+        ClearTfaSession(httpContext);
+
         var user = await GetUserByLoginSecurely(loginDto.Login, loginDto.Password);
 
         await EnsureAccountNotBlocked(user.Id);
@@ -301,7 +303,7 @@ public class AuthService : IAuthService
             throw new RequestErrorException(401, "Brak tokenu.");
         }
 
-        var principal = _jwtService.ValidateRefreshToken(refreshToken);
+        var principal = await _jwtService.ValidateRefreshToken(refreshToken);
         if (principal == null)
         {
             throw new RequestErrorException(401, "Nieprawidłowy token.");
@@ -320,5 +322,37 @@ public class AuthService : IAuthService
         }
 
         return GenerateLoginResponse(login);
+    }
+
+    public async Task Logout(string accessToken, string refreshToken)
+    {
+        var accessJti = _jwtService.GetJti(accessToken);
+        var accessTokenExpiresAt = _jwtService.GetExpiresAt(accessToken);
+        var revokedAccessToken = new BlacklistedToken
+        {
+            Jti = accessJti,
+            ExpiresAt = accessTokenExpiresAt
+        };
+
+        await _blacklistedTokenRepository.Add(revokedAccessToken);
+
+        if (!string.IsNullOrEmpty(refreshToken))
+        {
+            var principal = await _jwtService.ValidateRefreshToken(refreshToken);
+            if (principal == null)
+            {
+                throw new RequestErrorException(401, "Nieprawidłowy refresh token.");
+            }
+
+            var refreshJti = _jwtService.GetJti(refreshToken);
+            var refreshTokenExpiresAt = _jwtService.GetExpiresAt(refreshToken);
+            var revokedRefreshToken = new BlacklistedToken
+            {
+                Jti = refreshJti,
+                ExpiresAt = refreshTokenExpiresAt
+            };
+
+            await _blacklistedTokenRepository.Add(revokedRefreshToken);
+        }
     }
 }

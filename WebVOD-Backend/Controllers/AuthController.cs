@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.Auth;
@@ -118,10 +120,19 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpPost("Logout")]
-    public ActionResult Logout()
+    public async Task<ActionResult> Logout()
     {
-        //TODO: Unieważnić jwt access token użytkownika
-        //TODO: Oprócz usunięcia ciasteczka z jwt refresh token, unieważnić również ten refresh token użytkownika, jeśli istnieje
+        var authHeader = Request.Headers["Authorization"].ToString();
+        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+        {
+            return BadRequest("Brak lub nieprawidłowy nagłówek Authorization.");
+        }
+
+        var accessToken = authHeader.Substring("Bearer ".Length);
+        var refreshToken = Request.Cookies["refreshToken"];
+
+        await _authService.Logout(accessToken, refreshToken);
+
         Response.Cookies.Delete("refreshToken");
         return Ok("Wylogowano.");
     }

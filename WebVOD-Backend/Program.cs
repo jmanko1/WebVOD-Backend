@@ -10,7 +10,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.ConfigureAuthentication(builder.Configuration);
 builder.Services.ConfigureReposLayer();
-builder.Services.ConfigureServicesLayer();
+builder.Services.ConfigureServicesLayer(builder.Configuration);
 
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDB"));
