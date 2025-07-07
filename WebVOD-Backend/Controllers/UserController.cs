@@ -81,6 +81,7 @@ public class UserController : ControllerBase
     public async Task<ActionResult<string>> UpdateDescription(
         [FromBody]
         [Required(ErrorMessage = "Podaj opis.")]
+        [MinLength(1, ErrorMessage = "Podaj opis.")]
         [MaxLength(1000, ErrorMessage = "Opis kanału może mieć maksymalnie 1000 znaków.")]
         string description
     )
@@ -199,6 +200,20 @@ public class UserController : ControllerBase
         {
             await _userService.ToggleTFA(sub, toggleTFADto);
             return Ok("Uwierzytelnianie dwuskładnikowe zostało skonfigurowane.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [HttpGet("{login}/videos")]
+    public async Task<ActionResult<List<UserVideoDto>>> GetUserVideos(string login, int page = 1, int size = 10)
+    {
+        try
+        {
+            var videos = await _userService.GetUserVideos(login, page, size);
+            return Ok(videos);
         }
         catch (RequestErrorException ex)
         {

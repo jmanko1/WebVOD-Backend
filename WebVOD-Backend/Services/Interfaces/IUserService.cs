@@ -14,5 +14,6 @@ public interface IUserService
     Task ChangePassword(string sub, ChangePasswordDto changePasswordDto);
     Task<string?> GetTFAQrCode(string sub);
     Task ToggleTFA(string sub, ToggleTFADto toggleTFADto);
+    Task<List<UserVideoDto>> GetUserVideos(string login, int page, int size);
     Task<List<User>> GetAll();
 }

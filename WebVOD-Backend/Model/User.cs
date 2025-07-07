@@ -21,10 +21,10 @@ public class User
     [Required]
     public string Password { get; set; }
 
-    [StringLength(500)]
-    public string Description { get; set; } = null!;
+    [StringLength(1000)]
+    public string? Description { get; set; }
 
-    public string ImageUrl { get; set; } = null!;
+    public string? ImageUrl { get; set; }
 
     [Required]
     public bool IsTFAEnabled { get; set; } = false;
@@ -34,4 +34,7 @@ public class User
 
     [Required]
     public DateTime SignupDate { get; set; } = DateTime.UtcNow;
+
+    [Required]
+    public int VideosCount { get; set; } = 0;
 }

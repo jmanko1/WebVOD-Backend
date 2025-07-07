@@ -11,14 +11,16 @@ namespace WebVOD_Backend.Services.Implementations;
 public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IVideoRepository _videoRepository;
     private readonly IFilesService _filesService;
     private readonly ICryptoService _cryptoService;
 
-    public UserService(IUserRepository userRepository, IFilesService filesService, ICryptoService cryptoService)
+    public UserService(IUserRepository userRepository, IFilesService filesService, ICryptoService cryptoService, IVideoRepository videoRepository)
     {
         _userRepository = userRepository;
         _filesService = filesService;
         _cryptoService = cryptoService;
+        _videoRepository = videoRepository;
     }
 
     public async Task<UserDto> GetMyProfile(string sub)
@@ -56,7 +58,8 @@ public class UserService : IUserService
             Login = user.Login,
             Description = user.Description,
             ImageUrl = user.ImageUrl,
-            SignupDate = DateOnly.FromDateTime(user.SignupDate)
+            SignupDate = user.SignupDate,
+            VideosCount = user.VideosCount,
         };
 
         return userDto;
@@ -75,7 +78,7 @@ public class UserService : IUserService
 
     public async Task UpdateDescription(string sub, string description)
     {
-        if(string.IsNullOrEmpty(description))
+        if(string.IsNullOrWhiteSpace(description))
         {
             throw new RequestErrorException(400, "Podaj opis.");
         }
@@ -219,5 +222,27 @@ public class UserService : IUserService
         }
 
         await _userRepository.SetTFA(user.Id, !user.IsTFAEnabled);
+    }
+
+    public async Task<List<UserVideoDto>> GetUserVideos(string login, int page, int size)
+    {
+        var user = await _userRepository.FindByLogin(login);
+        if (user == null)
+        {
+            throw new RequestErrorException(404, "Użytkownik nie istnieje.");
+        }
+
+        var videos = await _videoRepository.FindByUserId(user.Id, page, size);
+        var videoDtos = videos.Select(v => new UserVideoDto
+        {
+            Id = v.Id,
+            Title = v.Title,
+            ThumbnailPath = v.ThumbnailPath,
+            UploadDate = v.UploadDate,
+            ViewsCount = v.ViewsCount,
+            Duration = v.Duration
+        }).ToList();
+
+        return videoDtos;
     }
 }
