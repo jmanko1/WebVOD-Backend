@@ -98,4 +98,10 @@ public class UserRepository : IUserRepository
 
         await _users.UpdateOneAsync(filter, update);
     }
+
+    public async Task<List<User>> FindById(List<string> ids)
+    {
+        var filter = Builders<User>.Filter.In(u => u.Id, ids);
+        return await _users.Find(filter).ToListAsync();
+    }
 }
