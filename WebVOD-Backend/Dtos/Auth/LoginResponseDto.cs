@@ -2,7 +2,7 @@
 
 public class LoginResponseDto
 {
-    public string Token { get; set; } = null!;
+    public string? Token { get; set; }
     public int ExpiresIn { get; set; }
     public bool TFARequired { get; set; }
 }
