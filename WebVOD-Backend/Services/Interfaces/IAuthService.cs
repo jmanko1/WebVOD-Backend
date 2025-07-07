@@ -10,4 +10,5 @@ public interface IAuthService
     Task InitiateResetPassword(string email);
     Task ResetPassword(ResetPasswordDto resetPasswordDto);
     Task<LoginResponseDto> Refresh(string refreshToken);
+    Task Logout(string accessToken, string refreshToken);
 }
