@@ -17,13 +17,14 @@ public class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
     private readonly IBlacklistedTokenRepository _blacklistedTokenRepository;
+    private readonly IEmailService _emailService;
 
     private const int MaxTimeSpanMinutes = 1;
     private const int MaxFailedAttempts = 5;
     private const int TFASessionLifetime = 5;
     private const int MaxTFACodeAttempts = 2;
 
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository, IEmailService emailService)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
@@ -32,6 +33,7 @@ public class AuthService : IAuthService
         _jwtService = jwtService;
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
         _blacklistedTokenRepository = blacklistedTokenRepository;
+        _emailService = emailService;
     }
 
     public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -171,6 +173,14 @@ public class AuthService : IAuthService
         };
 
         await _userRepository.Add(user);
+
+        var templatePath = Path.Combine("Templates", "WelcomeEmail.html");
+        var htmlBody = File.ReadAllText(templatePath);
+        htmlBody = htmlBody.Replace("[USER]", user.Login)
+                            .Replace("[LOGIN_URL]", "http://localhost:3000/login");
+        var subject = "Potwierdzenie rejestracji w WebVOD";
+
+        await _emailService.SendEmail(user.Email, subject, htmlBody);
     }
 
     public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -259,7 +269,6 @@ public class AuthService : IAuthService
         await _resetPasswordTokenRepository.RemoveByUserId(user.Id);
 
         var token = _cryptoService.GenerateResetPasswordToken(155);
-        Console.WriteLine(token);
         var resetPasswordToken = new ResetPasswordToken
         {
             UserId = user.Id,
@@ -267,6 +276,15 @@ public class AuthService : IAuthService
         };
 
         await _resetPasswordTokenRepository.Add(resetPasswordToken);
+
+        var templatePath = Path.Combine("Templates", "ResetPasswordEmail.html");
+        var htmlBody = File.ReadAllText(templatePath);
+        htmlBody = htmlBody.Replace("[USER]", user.Login)
+                           .Replace("[RESET_URL]", $"http://localhost:3000/reset-password/{token}")
+                           .Replace("[CZAS]", "15");
+        var subject = "Resetowanie hasła w WebVOD";
+
+        await _emailService.SendEmail(user.Email, subject, htmlBody);
     }
 
     public async Task ResetPassword(ResetPasswordDto resetPasswordDto)
@@ -280,7 +298,6 @@ public class AuthService : IAuthService
 
         if(resetPasswordToken.ValidUntil < DateTime.UtcNow)
         {
-            await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
             throw new RequestErrorException(401, "Token wygasł. Rozpocznij od nowa proces resetowania hasła.");
         }
 

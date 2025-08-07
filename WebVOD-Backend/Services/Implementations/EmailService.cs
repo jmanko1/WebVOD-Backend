@@ -15,7 +15,7 @@ public class EmailService : IEmailService
 
     public async Task SendEmail(string to, string subject, string body)
     {
-        var emailSettings = _configuration.GetSection("Email");
+        var emailSettings = _configuration.GetSection("EmailSettings");
 
         var from = emailSettings.GetValue<string>("Username");
         var password = emailSettings.GetValue<string>("Password");
@@ -24,19 +24,27 @@ public class EmailService : IEmailService
 
         try
         {
-            var client = new SmtpClient(smtpServer, port)
+            using (var client = new SmtpClient(smtpServer, port))
             {
-                EnableSsl = true,
-                UseDefaultCredentials = false,
-                Credentials = new NetworkCredential(from, password)
-            };
+                client.EnableSsl = true;
+                client.UseDefaultCredentials = false;
+                client.Credentials = new NetworkCredential(from, password);
 
-            var message = new MailMessage(from, to, subject, body);
-            await client.SendMailAsync(message);
+                using (var message = new MailMessage())
+                {
+                    message.From = new MailAddress(from);
+                    message.To.Add(new MailAddress(to));
+                    message.Subject = subject;
+                    message.Body = body;
+                    message.IsBodyHtml = true;
+
+                    await client.SendMailAsync(message);
+                }
+            }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            throw;
+            return;
         }
     }
 }
