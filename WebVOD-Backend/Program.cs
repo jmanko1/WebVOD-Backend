@@ -45,6 +45,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var indexInitializer = scope.ServiceProvider.GetRequiredService<MongoIndexInitializer>();
+    await indexInitializer.AddResetPasswordTokensIndexes();
+    await indexInitializer.AddBlacklistedTokensIndexes();
+}
+
 app.UseCors("AllowClient");
 app.UseSession();
 
