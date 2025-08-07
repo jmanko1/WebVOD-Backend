@@ -104,4 +104,20 @@ public class UserRepository : IUserRepository
         var filter = Builders<User>.Filter.In(u => u.Id, ids);
         return await _users.Find(filter).ToListAsync();
     }
+
+    public async Task IncrementVideosCount(string userId)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update.Inc(u => u.VideosCount, 1);
+
+        var result = await _users.UpdateOneAsync(filter, update);
+    }
+
+    public async Task DecrementVideosCount(string userId)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+        var update = Builders<User>.Update.Inc(u => u.VideosCount, -1);
+
+        var result = await _users.UpdateOneAsync(filter, update);
+    }
 }

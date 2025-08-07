@@ -1,5 +1,4 @@
-﻿using System.Xml.Linq;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
 using WebVOD_Backend.Model;
@@ -18,6 +17,11 @@ public class VideoRepository : IVideoRepository
         _videos = database.GetCollection<Video>("Videos");
     }
 
+    public async Task Add(Video video)
+    {
+        await _videos.InsertOneAsync(video);
+    }
+
     public async Task DecrementCommentsCount(string id)
     {
         var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
@@ -32,6 +36,12 @@ public class VideoRepository : IVideoRepository
         var update = Builders<Video>.Update.Inc(v => v.LikesCount, -1);
 
         var result = await _videos.UpdateOneAsync(filter, update);
+    }
+
+    public async Task<bool> ExistsById(string id)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        return await _videos.Find(filter).AnyAsync();
     }
 
     public async Task<Video> FindById(string id)
@@ -79,4 +89,21 @@ public class VideoRepository : IVideoRepository
         var result = await _videos.UpdateOneAsync(filter, update);
     }
 
+    public async Task UpdateStatus(string id, VideoStatus status)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        var update = Builders<Video>.Update
+            .Set(v => v.Status, status);
+
+        await _videos.UpdateOneAsync(filter, update);
+    }
+
+    public async Task UpdateThumbnail(string id, string thumbnailPath)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        var update = Builders<Video>.Update
+            .Set(v => v.ThumbnailPath, thumbnailPath);
+
+        await _videos.UpdateOneAsync(filter, update);
+    }
 }

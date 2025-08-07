@@ -17,4 +17,6 @@ public interface IUserRepository
     Task UpdateDescription(string userId, string description);
     Task UpdateImageUrl(string userId, string imageUrl);
     Task SetTFA(string userId, bool isTFAEnabled);
+    Task IncrementVideosCount(string userId);
+    Task DecrementVideosCount(string userId);
 }

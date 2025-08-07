@@ -22,12 +22,8 @@ public class Video
     public VideoCategory Category { get; set; }
 
     public List<string> Tags { get; set; } = new();
-
-    [Required]
-    public string VideoPath { get; set; }
-
-    [Required]
-    public string ThumbnailPath { get; set; }
+    public string? VideoPath { get; set; }
+    public string? ThumbnailPath { get; set; }
 
     [Required]
     public DateTime UploadDate { get; set; } = DateTime.UtcNow;
@@ -41,8 +37,7 @@ public class Video
     [Required]
     public int ViewsCount { get; set; } = 0;
 
-    [Required]
-    public int Duration { get; set; }
+    public int Duration { get; set; } = 0;
 
     [Required]
     [BsonRepresentation(BsonType.String)]
