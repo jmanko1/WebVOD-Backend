@@ -233,6 +233,7 @@ public class UserService : IUserService
         }
 
         var videos = await _videoRepository.FindByUserId(user.Id, page, size);
+
         var videoDtos = videos.Select(v => new UserVideoDto
         {
             Id = v.Id,
@@ -240,7 +241,31 @@ public class UserService : IUserService
             ThumbnailPath = v.ThumbnailPath,
             UploadDate = v.UploadDate,
             ViewsCount = v.ViewsCount,
-            Duration = v.Duration
+            Duration = v.Duration,
+        }).ToList();
+
+        return videoDtos;
+    }
+
+    public async Task<List<UserVideoDto>> GetMyVideos(string sub, int page, int size, string? titlePattern)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        var videos = await _videoRepository.FindByUserId(user.Id, page, size, titlePattern, false);
+        
+        var videoDtos = videos.Select(v => new UserVideoDto
+        {
+            Id = v.Id,
+            Title = v.Title,
+            ThumbnailPath = v.ThumbnailPath,
+            UploadDate = v.UploadDate,
+            ViewsCount = v.ViewsCount,
+            Duration = v.Duration,
+            Status = v.Status.ToString()
         }).ToList();
 
         return videoDtos;

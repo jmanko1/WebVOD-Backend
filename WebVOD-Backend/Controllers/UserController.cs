@@ -221,6 +221,27 @@ public class UserController : ControllerBase
         }
     }
 
+    [Authorize]
+    [HttpGet("my-profile/videos")]
+    public async Task<ActionResult<List<UserVideoDto>>> GetMyVideos(int page = 1, int size = 10, string? search = null)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var videos = await _userService.GetMyVideos(sub, page, size, search);
+            return Ok(videos);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<User>>> GetAll()
     {
