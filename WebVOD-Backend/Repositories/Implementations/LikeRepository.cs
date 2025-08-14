@@ -39,4 +39,11 @@ public class LikeRepository : ILikeRepository
 
         await _likes.DeleteOneAsync(filter);
     }
+
+    public async Task DeleteByVideoId(string videoId)
+    {
+        var filter = Builders<Like>.Filter.Eq(l => l.VideoId, videoId);
+
+        await _likes.DeleteManyAsync(filter);
+    }
 }

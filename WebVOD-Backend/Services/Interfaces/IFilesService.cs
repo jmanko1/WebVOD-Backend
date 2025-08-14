@@ -11,4 +11,5 @@ public interface IFilesService
     void DeleteThumbnail(string fileName);
     Task SaveVideoChunk(string videoId, int chunkIndex, IFormFile videoChunk);
     void MergeVideoChunks(string videoId);
+    void DeleteVideo(string fileName);
 }

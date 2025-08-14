@@ -8,4 +8,5 @@ public interface ICommentRepository
     Task<List<Comment>> FindByVideoId(string videoId, int page, int size);
     Task<string> Add(Comment comment);
     Task DeleteById(string id);
+    Task DeleteByVideoId(string id);
 }

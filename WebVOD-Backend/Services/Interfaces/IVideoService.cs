@@ -10,7 +10,10 @@ public interface IVideoService
     Task<bool> IsVideoLiked(string sub, string id);
     Task LikeVideo(string sub, string id);
     Task CancelLikeVideo(string sub, string id);
-    Task UploadChunk(IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks);
+    Task UploadChunk(string sub, IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks);
     Task<string> CreateNewVideo(string sub, CreateVideoDto createVideoDto);
     Task UpdateThumbnail(string sub, string id, IFormFile thumbnail);
+    Task<VideoToUpdateDto> GetVideoToUpdateById(string sub, string id);
+    Task UpdateVideoById(string sub, string id, UpdateVideoDto updateVideoDto);
+    Task DeleteVideoById(string sub, string id);
 }

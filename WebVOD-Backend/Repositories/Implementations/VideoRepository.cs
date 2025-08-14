@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Options;
+﻿using System.Xml;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
 using WebVOD_Backend.Model;
@@ -38,6 +40,13 @@ public class VideoRepository : IVideoRepository
         var result = await _videos.UpdateOneAsync(filter, update);
     }
 
+    public async Task DeleteById(string id)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+
+        await _videos.DeleteOneAsync(filter);
+    }
+
     public async Task<bool> ExistsById(string id)
     {
         var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
@@ -50,11 +59,22 @@ public class VideoRepository : IVideoRepository
         return await _videos.Find(filter).FirstOrDefaultAsync();
     }
 
-    public async Task<List<Video>> FindByUserId(string userId, int page, int size)
+    public async Task<List<Video>> FindByUserId(string userId, int page, int size, string? titlePattern = null, bool onlyPublished = true)
     {
         var builder = Builders<Video>.Filter;
-        var filter = builder.Eq(v => v.AuthorId, userId) &
-                     builder.Eq(v => v.Status, VideoStatus.PUBLISHED);
+
+        var filter = builder.Eq(v => v.AuthorId, userId);
+
+        if (onlyPublished)
+        {
+            filter &= builder.Eq(v => v.Status, VideoStatus.PUBLISHED);
+        }
+
+        if(!string.IsNullOrWhiteSpace(titlePattern))
+        {
+            var titleFilter = builder.Regex(v => v.Title, new BsonRegularExpression(titlePattern, "i"));
+            filter &= titleFilter;
+        }
 
         var videos = await _videos.Find(filter)
             .SortByDescending(v => v.UploadDate)
@@ -87,6 +107,19 @@ public class VideoRepository : IVideoRepository
         var update = Builders<Video>.Update.Inc(v => v.ViewsCount, 1);
 
         var result = await _videos.UpdateOneAsync(filter, update);
+    }
+
+    public async Task Replace(string id, Video video)
+    {
+        video.Id = id;
+
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+
+        await _videos.ReplaceOneAsync(
+            filter,
+            video,
+            new ReplaceOptions { IsUpsert = false }
+        );
     }
 
     public async Task UpdateStatus(string id, VideoStatus status)

@@ -107,6 +107,45 @@ public class VideoService : IVideoService
         return video.Id;
     }
 
+    public async Task DeleteVideoById(string sub, string id)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!ObjectId.TryParse(id, out _))
+        {
+            throw new RequestErrorException(404, "Szukany film nie istnieje.");
+        }
+
+        var video = await _videoRepository.FindById(id);
+        if (video == null)
+        {
+            throw new RequestErrorException(404, "Szukany film nie istnieje.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień do usunięcia tego filmu.");
+        }
+
+        await _userRepository.DecrementVideosCount(user.Id);
+        await _likeRepository.DeleteByVideoId(id);
+        await _commentRepository.DeleteByVideoId(id);
+
+        if (video.ThumbnailPath != null)
+        {
+            var fileNameToDelete = Path.GetFileName(video.ThumbnailPath);
+            _filesService.DeleteThumbnail(fileNameToDelete);
+        }
+
+        _filesService.DeleteVideo(id);
+
+        await _videoRepository.DeleteById(id);
+    }
+
     public async Task<VideoDto> GetVideoById(string id)
     {
         if (!ObjectId.TryParse(id, out _))
@@ -115,7 +154,7 @@ public class VideoService : IVideoService
         }
 
         var video = await _videoRepository.FindById(id);
-        if (video == null || video.Status == VideoStatus.UPLOADING)
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
         {
             throw new RequestErrorException(404, "Szukany film nie istnieje.");
         }
@@ -177,6 +216,43 @@ public class VideoService : IVideoService
         }).ToList();
 
         return commentDtos;
+    }
+
+    public async Task<VideoToUpdateDto> GetVideoToUpdateById(string sub, string id)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!ObjectId.TryParse(id, out _))
+        {
+            throw new RequestErrorException(404, "Szukany film nie istnieje.");
+        }
+
+        var video = await _videoRepository.FindById(id);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(404, "Szukany film nie istnieje.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień do aktualizacji tego filmu.");
+        }
+
+        var videoDto = new VideoToUpdateDto
+        {
+            Id = video.Id,
+            Title = video.Title,
+            Description = video.Description,
+            Category = video.Category.ToString(),
+            Tags = video.Tags,
+            ThumbnailPath = video.ThumbnailPath
+        };
+
+        return videoDto;
     }
 
     public async Task<bool> IsVideoLiked(string sub, string id)
@@ -290,8 +366,71 @@ public class VideoService : IVideoService
         await _videoRepository.UpdateThumbnail(video.Id, thumbnailPath);
     }
 
-    public async Task UploadChunk(IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks)
+    public async Task UpdateVideoById(string sub, string id, UpdateVideoDto updateVideoDto)
     {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!ObjectId.TryParse(id, out _))
+        {
+            throw new RequestErrorException(404, "Film nie istnieje.");
+        }
+
+        var video = await _videoRepository.FindById(id);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(404, "Film nie istnieje.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień do aktualizacji filmu.");
+        }
+
+        if (string.IsNullOrWhiteSpace(updateVideoDto.Title))
+        {
+            throw new RequestErrorException(400, "Podaj tytuł.");
+        }
+
+        if (updateVideoDto.Tags.Count() > 10)
+        {
+            throw new RequestErrorException(400, "Film może mieć maksymalnie 10 tagów.");
+        }
+
+        if (updateVideoDto.Tags.Any(t => t.Contains(' ')))
+        {
+            throw new RequestErrorException(400, "Tagi nie mogą zawierać spacji.");
+        }
+
+        if (updateVideoDto.Tags.Any(t => t.Length > 20))
+        {
+            throw new RequestErrorException(400, "Tagi mogą mieć maksymalnie 20 znaków.");
+        }
+
+        if (updateVideoDto.Tags.Distinct().Count() != updateVideoDto.Tags.Count())
+        {
+            throw new RequestErrorException(400, "Tagi muszą być unikalne.");
+        }
+
+        video.Title = updateVideoDto.Title;
+        video.Description = updateVideoDto.Description;
+        video.Category = updateVideoDto.Category;
+        video.Tags = updateVideoDto.Tags;
+
+        await _videoRepository.Replace(id, video);
+    }
+
+    public async Task UploadChunk(string sub, IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
         if (chunk == null || chunk.Length == 0)
         {
             throw new RequestErrorException(400, "Brak fragmentu filmu.");
@@ -313,7 +452,15 @@ public class VideoService : IVideoService
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
 
-        // TODO: Sprawdź, czy ten film należy do użytkownika, który przesłał fragment
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień.");
+        }
+
+        if (video.Status != VideoStatus.UPLOADING)
+        {
+            throw new RequestErrorException(400, "Film został już przesłany w całości.");
+        }
 
         if (!int.TryParse(currentChunkIndex, out int currentChunkIndexInt))
         {
@@ -354,7 +501,5 @@ public class VideoService : IVideoService
 
         // TODO: Przetwórz film do formatu HLS
         // TODO: Zapisz w metadanych ścieżkę do pliku m3u8
-        // TODO: Zmień status filmu na PUBLISHED (zrobione)
-        // TODO: Zwiększ liczbę filmów użytkownika o 1
     }
 }

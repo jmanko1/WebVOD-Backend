@@ -124,6 +124,8 @@ public class VideoController : ControllerBase
         try
         {
             var videoId = await _videoService.CreateNewVideo(sub, createVideoDto);
+            HttpContext.Session.SetString("UploadingSub", sub);
+
             return Ok(videoId);
         }
         catch (RequestErrorException ex)
@@ -136,13 +138,20 @@ public class VideoController : ControllerBase
     [RequestSizeLimit(6291456)] // 6 MB
     public async Task<ActionResult<string>> UploadChunk([FromForm] IFormFile videoChunk)
     {
+        var sub = HttpContext.Session.GetString("UploadingSub");
+        if (sub == null)
+        {
+            return Unauthorized();    
+        }
+
         var videoId = Request.Headers["Video-Id"].ToString();
         var currentChunkIndex = Request.Headers["Chunk-Index"].ToString();
         var totalChunks = Request.Headers["Total-Chunks"].ToString();
 
         try
         {
-            await _videoService.UploadChunk(videoChunk, videoId, currentChunkIndex, totalChunks);
+            await _videoService.UploadChunk(sub, videoChunk, videoId, currentChunkIndex, totalChunks);
+            HttpContext.Session.SetString("UploadingSub", sub);
 
             return Ok("Fragment filmu został pomyślnie przesłany.");
         }
@@ -180,5 +189,71 @@ public class VideoController : ControllerBase
     {
         var categories = Enum.GetNames(typeof(VideoCategory)).ToList();
         return Ok(categories);
+    }
+
+    [Authorize]
+    [HttpGet("{id}/update")]
+    public async Task<ActionResult<VideoToUpdateDto>> GetVideoToUpdateById(string id)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var video = await _videoService.GetVideoToUpdateById(sub, id);
+
+            return Ok(video);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("{id}/update")]
+    public async Task<ActionResult> UpdateVideoById(string id, [FromBody] UpdateVideoDto updateVideoDto)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.UpdateVideoById(sub, id, updateVideoDto);
+
+            return Ok("Film został zaktualizowany.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeleteVideoById(string id)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.DeleteVideoById(sub, id);
+
+            return Ok("Film został usunięty.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
     }
 }

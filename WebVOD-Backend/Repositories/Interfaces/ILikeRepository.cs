@@ -7,4 +7,5 @@ public interface ILikeRepository
     Task DeleteByVideoIdAndUserId(string videoId, string userId);
     Task<bool> ExistsByVideoIdAndUserId(string videoId, string userId);
     Task Add(Like like);
+    Task DeleteByVideoId(string videoId);
 }

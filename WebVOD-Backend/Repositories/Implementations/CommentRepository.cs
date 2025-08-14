@@ -29,6 +29,12 @@ public class CommentRepository : ICommentRepository
         await _comments.DeleteOneAsync(filter);
     }
 
+    public async Task DeleteByVideoId(string id)
+    {
+        var filter = Builders<Comment>.Filter.Eq(c => c.VideoId, id);
+        await _comments.DeleteManyAsync(filter);
+    }
+
     public async Task<Comment> FindById(string id)
     {
         var filter = Builders<Comment>.Filter.Eq(c => c.Id, id);

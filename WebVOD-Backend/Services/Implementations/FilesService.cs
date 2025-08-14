@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Services.Interfaces;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace WebVOD_Backend.Services.Implementations;
 
@@ -26,6 +25,16 @@ public class FilesService : IFilesService
         if (File.Exists(filePath))
         {
             File.Delete(filePath);
+        }
+    }
+
+    public void DeleteVideo(string id)
+    {
+        var directoryPath = Path.Combine(filesDirectory, "videos", id);
+
+        if (Directory.Exists(directoryPath))
+        {
+            Directory.Delete(directoryPath, recursive: true);
         }
     }
 
