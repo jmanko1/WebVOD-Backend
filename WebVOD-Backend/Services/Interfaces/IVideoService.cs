@@ -5,7 +5,7 @@ namespace WebVOD_Backend.Services.Interfaces;
 
 public interface IVideoService
 {
-    Task<VideoDto> GetVideoById(string id);
+    Task<VideoDto> GetVideoById(string? sub, string id);
     Task<List<CommentDto>> GetVideoComments(string id, int page, int size);
     Task<bool> IsVideoLiked(string sub, string id);
     Task LikeVideo(string sub, string id);

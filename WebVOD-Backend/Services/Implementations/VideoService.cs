@@ -1,4 +1,6 @@
-﻿using MongoDB.Bson;
+﻿using System.Globalization;
+using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
 using WebVOD_Backend.Dtos.Comment;
 using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Exceptions;
@@ -15,14 +17,16 @@ public class VideoService : IVideoService
     private readonly ICommentRepository _commentRepository;
     private readonly ILikeRepository _likeRepository;
     private readonly IFilesService _filesService;
+    private readonly IWatchingHistoryElementRepository _watchingHistoryElementRepository;
 
-    public VideoService(IVideoRepository videoRepository, IUserRepository userRepository, ICommentRepository commentRepository, ILikeRepository likeRepository, IFilesService filesService)
+    public VideoService(IVideoRepository videoRepository, IUserRepository userRepository, ICommentRepository commentRepository, ILikeRepository likeRepository, IFilesService filesService, IWatchingHistoryElementRepository watchingHistoryElementRepository)
     {
         _videoRepository = videoRepository;
         _userRepository = userRepository;
         _commentRepository = commentRepository;
         _likeRepository = likeRepository;
         _filesService = filesService;
+        _watchingHistoryElementRepository = watchingHistoryElementRepository;
     }
 
     public async Task CancelLikeVideo(string sub, string id)
@@ -39,7 +43,7 @@ public class VideoService : IVideoService
         }
 
         var video = await _videoRepository.FindById(id);
-        if (video == null)
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
         {
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
@@ -72,11 +76,6 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Film może mieć maksymalnie 10 tagów.");
         }
 
-        if (createVideoDto.Tags.Any(t => t.Contains(' ')))
-        {
-            throw new RequestErrorException(400, "Tagi nie mogą zawierać spacji.");
-        }
-
         if (createVideoDto.Tags.Any(t => t.Length > 20))
         {
             throw new RequestErrorException(400, "Tagi mogą mieć maksymalnie 20 znaków.");
@@ -87,17 +86,26 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Tagi muszą być unikalne.");
         }
 
+        if (createVideoDto.Tags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
+        {
+            throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
+        }
+
         if (createVideoDto.Duration <= 0)
         {
             throw new RequestErrorException(400, "Nieprawidłowa długość filmu.");
         }
+
+        var formatedTags = createVideoDto.Tags
+            .OrderBy(t => t)
+            .ToList();
 
         var video = new Video
         {
             Title = createVideoDto.Title,
             Description = createVideoDto.Description,
             Category = createVideoDto.Category,
-            Tags = createVideoDto.Tags,
+            Tags = formatedTags,
             AuthorId = user.Id,
             Duration = createVideoDto.Duration
         };
@@ -134,6 +142,7 @@ public class VideoService : IVideoService
         await _userRepository.DecrementVideosCount(user.Id);
         await _likeRepository.DeleteByVideoId(id);
         await _commentRepository.DeleteByVideoId(id);
+        await _watchingHistoryElementRepository.DeleteByVideoId(id);
 
         if (video.ThumbnailPath != null)
         {
@@ -142,11 +151,10 @@ public class VideoService : IVideoService
         }
 
         _filesService.DeleteVideo(id);
-
         await _videoRepository.DeleteById(id);
     }
 
-    public async Task<VideoDto> GetVideoById(string id)
+    public async Task<VideoDto> GetVideoById(string? sub, string id)
     {
         if (!ObjectId.TryParse(id, out _))
         {
@@ -166,6 +174,28 @@ public class VideoService : IVideoService
         }
 
         await _videoRepository.IncrementViewsCount(id);
+
+        if (sub != null)
+        {
+            var viewer = await _userRepository.FindByLogin(sub);
+            if (viewer != null)
+            {
+                if (await _watchingHistoryElementRepository.ExistsByVideoIdAndViewerId(video.Id, viewer.Id))
+                {
+                    await _watchingHistoryElementRepository.UpdateViewedAt(video.Id, viewer.Id);
+                }
+                else
+                {
+                    var watchingHistoryElement = new WatchingHistoryElement
+                    {
+                        VideoId = video.Id,
+                        ViewerId = viewer.Id
+                    };
+
+                    await _watchingHistoryElementRepository.Add(watchingHistoryElement);
+                }
+            }
+        }
 
         var videoDto = new VideoDto
         {
@@ -292,7 +322,7 @@ public class VideoService : IVideoService
         }
 
         var video = await _videoRepository.FindById(id);
-        if (video == null)
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
         {
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
@@ -400,11 +430,6 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Film może mieć maksymalnie 10 tagów.");
         }
 
-        if (updateVideoDto.Tags.Any(t => t.Contains(' ')))
-        {
-            throw new RequestErrorException(400, "Tagi nie mogą zawierać spacji.");
-        }
-
         if (updateVideoDto.Tags.Any(t => t.Length > 20))
         {
             throw new RequestErrorException(400, "Tagi mogą mieć maksymalnie 20 znaków.");
@@ -415,10 +440,19 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Tagi muszą być unikalne.");
         }
 
+        if (updateVideoDto.Tags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
+        {
+            throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
+        }
+
+        var formatedTags = updateVideoDto.Tags
+            .OrderBy(t => t)
+            .ToList();
+
         video.Title = updateVideoDto.Title;
         video.Description = updateVideoDto.Description;
         video.Category = updateVideoDto.Category;
-        video.Tags = updateVideoDto.Tags;
+        video.Tags = formatedTags;
 
         await _videoRepository.Replace(id, video);
     }

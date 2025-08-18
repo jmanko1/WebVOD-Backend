@@ -39,7 +39,7 @@ public class CommentService : ICommentService
         }
 
         var video = await _videoRepository.FindById(newCommentDto.VideoId);
-        if (video == null)
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
         {
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
@@ -79,6 +79,17 @@ public class CommentService : ICommentService
         if (comment.AuthorId != user.Id)
         {
             throw new RequestErrorException(403, "Brak uprawnień.");
+        }
+
+        var video = await _videoRepository.FindById(comment.VideoId);
+        if (video == null)
+        {
+            throw new RequestErrorException(500, "Film, do którego jest komentarz, nie istnieje.");
+        }
+
+        if (video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(400, "Nie można usuwać komentarza do nieopublikowanego filmu.");
         }
 
         await _commentRepository.DeleteById(commentId);
