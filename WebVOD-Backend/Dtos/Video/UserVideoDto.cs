@@ -1,4 +1,4 @@
-﻿namespace WebVOD_Backend.Dtos.User;
+﻿namespace WebVOD_Backend.Dtos.Video;
 
 public class UserVideoDto
 {
