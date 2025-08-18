@@ -1,6 +1,4 @@
-﻿using WebVOD_Backend.Model;
-
-namespace WebVOD_Backend.Dtos.Video;
+﻿namespace WebVOD_Backend.Dtos.Video;
 
 public class VideoDto
 {
