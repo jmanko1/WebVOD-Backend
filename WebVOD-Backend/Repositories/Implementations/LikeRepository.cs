@@ -46,4 +46,16 @@ public class LikeRepository : ILikeRepository
 
         await _likes.DeleteManyAsync(filter);
     }
+
+    public async Task<List<Like>> FindByUserId(string userId, int page, int size)
+    {
+        var filter = Builders<Like>.Filter.Eq(l => l.UserId, userId);
+        var likes = await _likes.Find(filter)
+            .SortByDescending(l => l.LikedAt)
+            .Skip((page - 1) * size)
+            .Limit(size)
+            .ToListAsync();
+
+        return likes;
+    }
 }

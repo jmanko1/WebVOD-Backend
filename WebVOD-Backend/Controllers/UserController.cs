@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.User;
+using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
 using WebVOD_Backend.Services.Interfaces;
@@ -234,6 +235,48 @@ public class UserController : ControllerBase
         try
         {
             var videos = await _userService.GetMyVideos(sub, page, size, search);
+            return Ok(videos);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("my-profile/liked-videos")]
+    public async Task<ActionResult<List<UserVideoActivityDto>>> GetLikedVideos(int page = 1, int size = 10)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var videos = await _userService.GetLikedVideos(sub, page, size);
+            return Ok(videos);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("my-profile/watched-videos")]
+    public async Task<ActionResult<List<UserVideoActivityDto>>> GetViewedVideos(int page = 1, int size = 10)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var videos = await _userService.GetViewedVideos(sub, page, size);
             return Ok(videos);
         }
         catch (RequestErrorException ex)

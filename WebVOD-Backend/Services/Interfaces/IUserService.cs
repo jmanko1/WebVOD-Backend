@@ -1,7 +1,5 @@
-﻿using System.Drawing;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.SignalR;
-using WebVOD_Backend.Dtos.User;
+﻿using WebVOD_Backend.Dtos.User;
+using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Model;
 
 namespace WebVOD_Backend.Services.Interfaces;
@@ -19,5 +17,7 @@ public interface IUserService
     Task ToggleTFA(string sub, ToggleTFADto toggleTFADto);
     Task<List<UserVideoDto>> GetUserVideos(string login, int page, int size);
     Task<List<UserVideoDto>> GetMyVideos(string sub, int page, int size, string? titlePattern);
+    Task<List<UserVideoActivityDto>> GetLikedVideos(string sub, int page, int size);
+    Task<List<UserVideoActivityDto>> GetViewedVideos(string sub, int page, int size);
     Task<List<User>> GetAll();
 }

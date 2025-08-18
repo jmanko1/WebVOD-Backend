@@ -1,5 +1,4 @@
-﻿using System.Xml;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
@@ -57,6 +56,15 @@ public class VideoRepository : IVideoRepository
     {
         var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
         return await _videos.Find(filter).FirstOrDefaultAsync();
+    }
+
+    public async Task<List<Video>> FindById(List<string> ids)
+    {
+        var builder = Builders<Video>.Filter;
+        var filter = builder.In(v => v.Id, ids) &
+                     builder.Eq(v => v.Status, VideoStatus.PUBLISHED);
+
+        return await _videos.Find(filter).ToListAsync();
     }
 
     public async Task<List<Video>> FindByUserId(string userId, int page, int size, string? titlePattern = null, bool onlyPublished = true)

@@ -1,6 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using OtpNet;
 using WebVOD_Backend.Dtos.User;
+using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
 using WebVOD_Backend.Repositories.Interfaces;
@@ -14,13 +15,17 @@ public class UserService : IUserService
     private readonly IVideoRepository _videoRepository;
     private readonly IFilesService _filesService;
     private readonly ICryptoService _cryptoService;
+    private readonly ILikeRepository _likeRepository;
+    private readonly IWatchingHistoryElementRepository _watchingHistoryElementRepository;
 
-    public UserService(IUserRepository userRepository, IFilesService filesService, ICryptoService cryptoService, IVideoRepository videoRepository)
+    public UserService(IUserRepository userRepository, IFilesService filesService, ICryptoService cryptoService, IVideoRepository videoRepository, ILikeRepository likeRepository, IWatchingHistoryElementRepository watchingHistoryElementRepository)
     {
         _userRepository = userRepository;
         _filesService = filesService;
         _cryptoService = cryptoService;
         _videoRepository = videoRepository;
+        _likeRepository = likeRepository;
+        _watchingHistoryElementRepository = watchingHistoryElementRepository;
     }
 
     public async Task<UserDto> GetMyProfile(string sub)
@@ -270,4 +275,84 @@ public class UserService : IUserService
 
         return videoDtos;
     }
+
+    public async Task<List<UserVideoActivityDto>> GetLikedVideos(string sub, int page, int size)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        var likes = await _likeRepository.FindByUserId(user.Id, page, size);
+
+        var videoIds = likes
+            .Select(l => l.VideoId)
+            .Distinct()
+            .ToList();
+
+        var videos = await _videoRepository.FindById(videoIds);
+
+        var authorIds = videos.Select(v => v.AuthorId).Distinct().ToList();
+        var authors = await _userRepository.FindById(authorIds);
+        var authorsDict = authors.ToDictionary(a => a.Id);
+
+        var videoDtosDict = videos.Select(v => new UserVideoActivityDto
+        {
+            Id = v.Id,
+            Title = v.Title,
+            ThumbnailPath = v.ThumbnailPath,
+            UploadDate = v.UploadDate,
+            ViewsCount = v.ViewsCount,
+            Duration = v.Duration,
+            AuthorLogin = authorsDict[v.AuthorId].Login
+        }).ToDictionary(dto => dto.Id);
+
+        var orderedDtos = likes
+            .Select(l => videoDtosDict[l.VideoId])
+            .ToList();
+
+        return orderedDtos;
+    }
+
+
+    public async Task<List<UserVideoActivityDto>> GetViewedVideos(string sub, int page, int size)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        var historyElements = await _watchingHistoryElementRepository.FindByViewerId(user.Id, page, size);
+
+        var videoIds = historyElements
+            .Select(el => el.VideoId)
+            .Distinct()
+            .ToList();
+
+        var videos = await _videoRepository.FindById(videoIds);
+
+        var authorIds = videos.Select(v => v.AuthorId).Distinct().ToList();
+        var authors = await _userRepository.FindById(authorIds);
+        var authorsDict = authors.ToDictionary(a => a.Id);
+
+        var videoDtosDict = videos.Select(v => new UserVideoActivityDto
+        {
+            Id = v.Id,
+            Title = v.Title,
+            ThumbnailPath = v.ThumbnailPath,
+            UploadDate = v.UploadDate,
+            ViewsCount = v.ViewsCount,
+            Duration = v.Duration,
+            AuthorLogin = authorsDict[v.AuthorId].Login
+        }).ToDictionary(dto => dto.Id);
+
+        var orderedDtos = historyElements
+            .Select(h => videoDtosDict[h.VideoId])
+            .ToList();
+
+        return orderedDtos;
+    }
+
 }

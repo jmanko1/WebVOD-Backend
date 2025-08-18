@@ -5,6 +5,7 @@ namespace WebVOD_Backend.Repositories.Interfaces;
 public interface IVideoRepository
 {
     Task<Video> FindById(string id);
+    Task<List<Video>> FindById(List<string> ids);
     Task<List<Video>> FindByUserId(string userId, int page, int size, string? titlePattern = null, bool onlyPublished = true);
     Task IncrementViewsCount(string id);
     Task IncrementCommentsCount(string id);

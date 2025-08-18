@@ -4,7 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace WebVOD_Backend.Model;
 
-public class Like
+public class WatchingHistoryElement
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
@@ -12,12 +12,12 @@ public class Like
 
     [Required]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string UserId { get; set; }
-
-    [Required]
-    [BsonRepresentation(BsonType.ObjectId)]
     public string VideoId { get; set; }
 
     [Required]
-    public DateTime LikedAt { get; set; } = DateTime.UtcNow;
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string ViewerId { get; set; }
+
+    [Required]
+    public DateTime ViewedAt { get; set; } = DateTime.UtcNow;
 }

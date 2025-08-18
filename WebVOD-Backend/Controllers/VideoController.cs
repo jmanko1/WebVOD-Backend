@@ -23,9 +23,11 @@ public class VideoController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<VideoDto>> GetVideoById(string id)
     {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
         try
         {
-            var video = await _videoService.GetVideoById(id);
+            var video = await _videoService.GetVideoById(sub, id);
             return Ok(video);
         }
         catch (RequestErrorException ex)

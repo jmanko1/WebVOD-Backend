@@ -16,6 +16,7 @@ public static class ReposLayerExtension
         services.AddScoped<ICommentRepository, CommentRepository>();
         services.AddScoped<ILikeRepository, LikeRepository>();
         services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
+        services.AddScoped<IWatchingHistoryElementRepository, WatchingHistoryElementRepository>();
 
         return services;
     }
