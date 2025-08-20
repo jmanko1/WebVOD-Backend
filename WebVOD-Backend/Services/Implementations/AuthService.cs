@@ -174,13 +174,13 @@ public class AuthService : IAuthService
 
         await _userRepository.Add(user);
 
-        var templatePath = Path.Combine("Templates", "WelcomeEmail.html");
-        var htmlBody = File.ReadAllText(templatePath);
-        htmlBody = htmlBody.Replace("[USER]", user.Login)
-                            .Replace("[LOGIN_URL]", "http://localhost:3000/login");
-        var subject = "Potwierdzenie rejestracji w WebVOD";
+        //var templatePath = Path.Combine("Templates", "WelcomeEmail.html");
+        //var htmlBody = File.ReadAllText(templatePath);
+        //htmlBody = htmlBody.Replace("[USER]", user.Login)
+        //                    .Replace("[LOGIN_URL]", "http://localhost:3000/login");
+        //var subject = "Potwierdzenie rejestracji w WebVOD";
 
-        await _emailService.SendEmail(user.Email, subject, htmlBody);
+        //await _emailService.SendEmail(user.Email, subject, htmlBody);
     }
 
     public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -277,14 +277,14 @@ public class AuthService : IAuthService
 
         await _resetPasswordTokenRepository.Add(resetPasswordToken);
 
-        var templatePath = Path.Combine("Templates", "ResetPasswordEmail.html");
-        var htmlBody = File.ReadAllText(templatePath);
-        htmlBody = htmlBody.Replace("[USER]", user.Login)
-                           .Replace("[RESET_URL]", $"http://localhost:3000/reset-password/{token}")
-                           .Replace("[CZAS]", "15");
-        var subject = "Resetowanie hasła w WebVOD";
+        //var templatePath = Path.Combine("Templates", "ResetPasswordEmail.html");
+        //var htmlBody = File.ReadAllText(templatePath);
+        //htmlBody = htmlBody.Replace("[USER]", user.Login)
+        //                   .Replace("[RESET_URL]", $"http://localhost:3000/reset-password/{token}")
+        //                   .Replace("[CZAS]", "15");
+        //var subject = "Resetowanie hasła w WebVOD";
 
-        await _emailService.SendEmail(user.Email, subject, htmlBody);
+        //await _emailService.SendEmail(user.Email, subject, htmlBody);
     }
 
     public async Task ResetPassword(ResetPasswordDto resetPasswordDto)
