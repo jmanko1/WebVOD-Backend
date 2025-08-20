@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using WebVOD_Backend.Dtos.Comment;
@@ -97,6 +98,7 @@ public class VideoService : IVideoService
         }
 
         var formatedTags = createVideoDto.Tags
+            .Select(t => t.ToLower())
             .OrderBy(t => t)
             .ToList();
 
@@ -446,6 +448,7 @@ public class VideoService : IVideoService
         }
 
         var formatedTags = updateVideoDto.Tags
+            .Select(t => t.ToLower())
             .OrderBy(t => t)
             .ToList();
 
@@ -528,12 +531,44 @@ public class VideoService : IVideoService
             _ = Task.Run(async () =>
             {
                 _filesService.MergeVideoChunks(videoId);
-                await _videoRepository.UpdateStatus(videoId, VideoStatus.PUBLISHED);
-                await _userRepository.IncrementVideosCount(video.AuthorId);
+                await _videoRepository.UpdateStatus(videoId, VideoStatus.PROCESSED);
+
+                var batPath = @"C:\Users\Kuba\source\repos\WebVOD-Backend\WebVOD-Backend\ffmpeg\bin\convert.bat";
+
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = batPath,
+                    Arguments = videoId,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = @"C:\Users\Kuba\source\repos\WebVOD-Backend\WebVOD-Backend\ffmpeg\bin"
+                };
+
+                using var process = new Process { StartInfo = processInfo };
+
+                process.OutputDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
+                process.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    await _videoRepository.UpdateStatus(videoId, VideoStatus.FAILED);
+                }
+                else
+                {
+                    await _videoRepository.UpdateStatus(videoId, VideoStatus.PUBLISHED);
+                    await _userRepository.IncrementVideosCount(video.AuthorId);
+                    await _videoRepository.UpdateVideoPath(videoId, $"/uploads/videos/{videoId}/master.m3u8");
+                    _filesService.DeleteVideoMP4(videoId);
+                }
             });
         }
-
-        // TODO: Przetwórz film do formatu HLS
-        // TODO: Zapisz w metadanych ścieżkę do pliku m3u8
     }
 }

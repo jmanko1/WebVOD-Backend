@@ -147,4 +147,13 @@ public class VideoRepository : IVideoRepository
 
         await _videos.UpdateOneAsync(filter, update);
     }
+
+    public async Task UpdateVideoPath(string id, string videoPath)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        var update = Builders<Video>.Update
+            .Set(v => v.VideoPath, videoPath);
+
+        await _videos.UpdateOneAsync(filter, update);
+    }
 }

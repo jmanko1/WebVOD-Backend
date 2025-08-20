@@ -38,6 +38,16 @@ public class FilesService : IFilesService
         }
     }
 
+    public void DeleteVideoMP4(string id)
+    {
+        var filePath = Path.Combine(filesDirectory, "videos", id, $"{id}.mp4");
+
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+    }
+
     public FileStreamResult GetFile(string fileName)
     {
         if (string.IsNullOrEmpty(fileName))

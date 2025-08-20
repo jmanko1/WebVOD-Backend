@@ -17,5 +17,6 @@ public interface IVideoRepository
     Task Replace(string id, Video video);
     Task UpdateThumbnail(string id, string thumbnailPath);
     Task UpdateStatus(string id, VideoStatus status);
+    Task UpdateVideoPath(string id, string videoPath);
     Task DeleteById(string id);
 }

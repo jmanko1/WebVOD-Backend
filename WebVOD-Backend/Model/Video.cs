@@ -65,5 +65,7 @@ public enum VideoCategory
 public enum VideoStatus
 {
     UPLOADING,
+    PROCESSED,
+    FAILED,
     PUBLISHED
 }
