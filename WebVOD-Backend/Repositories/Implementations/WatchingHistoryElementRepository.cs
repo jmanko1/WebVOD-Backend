@@ -28,6 +28,12 @@ public class WatchingHistoryElementRepository : IWatchingHistoryElementRepositor
         await _watchingHistoryElements.DeleteManyAsync(filter);
     }
 
+    public async Task DeleteByViewerId(string viewerId)
+    {
+        var filter = Builders<WatchingHistoryElement>.Filter.Eq(el => el.ViewerId, viewerId);
+        await _watchingHistoryElements.DeleteManyAsync(filter);
+    }
+
     public async Task<bool> ExistsByVideoIdAndViewerId(string videoId, string viewerId)
     {
         var builder = Builders<WatchingHistoryElement>.Filter;

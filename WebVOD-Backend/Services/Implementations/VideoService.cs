@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
-using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using WebVOD_Backend.Dtos.Comment;
 using WebVOD_Backend.Dtos.Video;
@@ -19,6 +17,8 @@ public class VideoService : IVideoService
     private readonly ILikeRepository _likeRepository;
     private readonly IFilesService _filesService;
     private readonly IWatchingHistoryElementRepository _watchingHistoryElementRepository;
+
+    private const string recommendationsAPI = "http://localhost:5000";
 
     public VideoService(IVideoRepository videoRepository, IUserRepository userRepository, ICommentRepository commentRepository, ILikeRepository likeRepository, IFilesService filesService, IWatchingHistoryElementRepository watchingHistoryElementRepository)
     {

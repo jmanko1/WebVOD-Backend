@@ -355,4 +355,32 @@ public class UserService : IUserService
         return orderedDtos;
     }
 
+    public async Task ClearHistory(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        await _watchingHistoryElementRepository.DeleteByViewerId(user.Id);
+    }
+
+    public async Task<List<SearchUserDto>> SearchUsers(string query, int page, int size)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length == 0)
+        {
+            throw new RequestErrorException(400, "Podaj hasło wyszukiwania.");
+        }
+
+        var users = await _userRepository.GetUsersByLoginRegex(query, page, size);
+        var userDtos = users.Select(u => new SearchUserDto
+        {
+            Login = u.Login,
+            Description = u.Description,
+            ImageUrl = u.ImageUrl
+        }).ToList();
+
+        return userDtos;
+    }
 }

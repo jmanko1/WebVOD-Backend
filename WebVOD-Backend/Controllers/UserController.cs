@@ -285,6 +285,41 @@ public class UserController : ControllerBase
         }
     }
 
+    [Authorize]
+    [HttpDelete("my-profile/watched-videos")]
+    public async Task<ActionResult> ClearHistory()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.ClearHistory(sub);
+            return Ok("Historia została wyczyszczona.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [HttpGet("search")]
+    public async Task<ActionResult<List<SearchUserDto>>> SearchUsers(string query, int page = 1, int size = 10)
+    {
+        try
+        {
+            var users = await _userService.SearchUsers(query, page, size);
+            return Ok(users);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<User>>> GetAll()
     {

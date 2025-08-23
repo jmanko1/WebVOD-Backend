@@ -9,4 +9,5 @@ public interface IWatchingHistoryElementRepository
     Task UpdateViewedAt(string videoId, string viewerId);
     Task<List<WatchingHistoryElement>> FindByViewerId(string viewerId, int page, int size);
     Task DeleteByVideoId(string videoId);
+    Task DeleteByViewerId(string viewerId);
 }

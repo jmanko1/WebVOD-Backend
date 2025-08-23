@@ -19,4 +19,5 @@ public interface IUserRepository
     Task SetTFA(string userId, bool isTFAEnabled);
     Task IncrementVideosCount(string userId);
     Task DecrementVideosCount(string userId);
+    Task<List<User>> GetUsersByLoginRegex(string loginRegex, int page, int size);
 }

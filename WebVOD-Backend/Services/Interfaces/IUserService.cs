@@ -19,5 +19,7 @@ public interface IUserService
     Task<List<UserVideoDto>> GetMyVideos(string sub, int page, int size, string? titlePattern);
     Task<List<UserVideoActivityDto>> GetLikedVideos(string sub, int page, int size);
     Task<List<UserVideoActivityDto>> GetViewedVideos(string sub, int page, int size);
+    Task ClearHistory(string sub);
+    Task<List<SearchUserDto>> SearchUsers(string query, int page, int size);
     Task<List<User>> GetAll();
 }

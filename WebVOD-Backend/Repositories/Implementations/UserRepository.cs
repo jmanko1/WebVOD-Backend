@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using WebVOD_Backend.Config;
 using WebVOD_Backend.Model;
@@ -119,5 +120,16 @@ public class UserRepository : IUserRepository
         var update = Builders<User>.Update.Inc(u => u.VideosCount, -1);
 
         var result = await _users.UpdateOneAsync(filter, update);
+    }
+
+    public async Task<List<User>> GetUsersByLoginRegex(string loginRegex, int page, int size)
+    {
+        var filter = Builders<User>.Filter.Regex(u => u.Login, new BsonRegularExpression(loginRegex, "i"));
+        var users = await _users.Find(filter)
+            .Skip((page - 1) * size)
+            .Limit(size)
+            .ToListAsync();
+
+        return users;
     }
 }
