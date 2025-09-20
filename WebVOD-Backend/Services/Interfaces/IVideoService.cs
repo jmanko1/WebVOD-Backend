@@ -11,6 +11,7 @@ public interface IVideoService
     Task LikeVideo(string sub, string id);
     Task CancelLikeVideo(string sub, string id);
     Task UploadChunk(string sub, IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks);
+    Task CancelUpload(string sub, string id);
     Task<string> CreateNewVideo(string sub, CreateVideoDto createVideoDto);
     Task UpdateThumbnail(string sub, string id, IFormFile thumbnail);
     Task<VideoToUpdateDto> GetVideoToUpdateById(string sub, string id);

@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using MongoDB.Bson;
 using WebVOD_Backend.Dtos.Comment;
 using WebVOD_Backend.Dtos.Video;
@@ -136,12 +138,20 @@ public class VideoService : IVideoService
             throw new RequestErrorException(404, "Szukany film nie istnieje.");
         }
 
+        var allowedStatuses = new List<VideoStatus> { VideoStatus.PUBLISHED, VideoStatus.FAILED };
+        if (!allowedStatuses.Contains(video.Status))
+        {
+            throw new RequestErrorException(400, "Nie można usunąć filmu, który jest w trakcie przesyłania lub przetwarzania.");
+        }
+
         if (video.AuthorId != user.Id)
         {
             throw new RequestErrorException(403, "Brak uprawnień do usunięcia tego filmu.");
         }
 
-        await _userRepository.DecrementVideosCount(user.Id);
+        if (video.Status == VideoStatus.PUBLISHED)
+            await _userRepository.DecrementVideosCount(user.Id);
+
         await _likeRepository.DeleteByVideoId(id);
         await _commentRepository.DeleteByVideoId(id);
         await _watchingHistoryElementRepository.DeleteByVideoId(id);
@@ -154,6 +164,15 @@ public class VideoService : IVideoService
 
         _filesService.DeleteVideo(id);
         await _videoRepository.DeleteById(id);
+
+        if (video.Status == VideoStatus.PUBLISHED)
+        {
+            _ = Task.Run(async () =>
+            {
+                using var client = new HttpClient();
+                await client.DeleteAsync($"{recommendationsAPI}/delete-video?id={id}");
+            });
+        }
     }
 
     public async Task<VideoDto> GetVideoById(string? sub, string id)
@@ -364,6 +383,12 @@ public class VideoService : IVideoService
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
 
+        var allowedStatuses = new List<VideoStatus> { VideoStatus.PUBLISHED, VideoStatus.UPLOADING };
+        if (!allowedStatuses.Contains(video.Status))
+        {
+            throw new RequestErrorException(400, "Film musi być opublikowany lub w trakcie przesyłania.");
+        }
+
         if (video.AuthorId != user.Id)
         {
             throw new RequestErrorException(403, "Brak uprawnień do zmiany miniatury filmu.");
@@ -458,6 +483,24 @@ public class VideoService : IVideoService
         video.Tags = formatedTags;
 
         await _videoRepository.Replace(id, video);
+
+        _ = Task.Run(async () =>
+        {
+                var videoData = new
+                {
+                    Title = video.Title,
+                    Description = video.Description,
+                    Category = video.Category.ToString(),
+                    Tags = video.Tags,
+                    AuthorLogin = sub
+                };
+
+                var json = JsonSerializer.Serialize(videoData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                using var client = new HttpClient();
+                await client.PutAsync($"{recommendationsAPI}/update-video?id={id}", content);
+        });
     }
 
     public async Task UploadChunk(string sub, IFormFile chunk, string videoId, string currentChunkIndex, string totalChunks)
@@ -489,14 +532,14 @@ public class VideoService : IVideoService
             throw new RequestErrorException(404, "Film nie istnieje.");
         }
 
+        if (video.Status != VideoStatus.UPLOADING)
+        {
+            throw new RequestErrorException(400, "Film nie jest w trakcie przesyłania.");
+        }
+
         if (video.AuthorId != user.Id)
         {
             throw new RequestErrorException(403, "Brak uprawnień.");
-        }
-
-        if (video.Status != VideoStatus.UPLOADING)
-        {
-            throw new RequestErrorException(400, "Film został już przesłany w całości.");
         }
 
         if (!int.TryParse(currentChunkIndex, out int currentChunkIndexInt))
@@ -567,8 +610,56 @@ public class VideoService : IVideoService
                     await _userRepository.IncrementVideosCount(video.AuthorId);
                     await _videoRepository.UpdateVideoPath(videoId, $"/uploads/videos/{videoId}/master.m3u8");
                     _filesService.DeleteVideoMP4(videoId);
+
+                    var videoData = new
+                    {
+                        Id = videoId,
+                        Title = video.Title,
+                        Description = video.Description,
+                        Category = video.Category.ToString(),
+                        Tags = video.Tags,
+                        AuthorLogin = sub
+                    };
+
+                    var json = JsonSerializer.Serialize(videoData);
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    using var client = new HttpClient();
+                    await client.PostAsync($"{recommendationsAPI}/add-video", content);
                 }
             });
         }
+    }
+
+    public async Task CancelUpload(string sub, string id)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+        }
+
+        if (!ObjectId.TryParse(id, out _))
+        {
+            throw new RequestErrorException(404, "Film nie istnieje.");
+        }
+
+        var video = await _videoRepository.FindById(id);
+        if (video == null)
+        {
+            throw new RequestErrorException(404, "Film nie istnieje.");
+        }
+
+        if (video.Status != VideoStatus.UPLOADING)
+        {
+            throw new RequestErrorException(400, "Film nie jest w trakcie przesyłania.");
+        }
+
+        if (user.Id != video.AuthorId)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień.");
+        }
+
+        await _videoRepository.UpdateStatus(id, VideoStatus.FAILED);
     }
 }

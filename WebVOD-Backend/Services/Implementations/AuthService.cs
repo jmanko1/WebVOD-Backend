@@ -1,4 +1,7 @@
 ﻿using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
 using OtpNet;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
@@ -23,6 +26,8 @@ public class AuthService : IAuthService
     private const int MaxFailedAttempts = 5;
     private const int TFASessionLifetime = 5;
     private const int MaxTFACodeAttempts = 2;
+    private const string recommendationsAPI = "http://localhost:5000";
+
 
     public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository, IEmailService emailService)
     {
@@ -152,7 +157,7 @@ public class AuthService : IAuthService
 
     public async Task Register(RegisterDto registerDto)
     {
-        if(await _userRepository.ExistsByLogin(registerDto.Login))
+        if (await _userRepository.ExistsByLogin(registerDto.Login))
         {
             throw new RequestErrorException(400, "Ten login jest zajęty.");
         }
@@ -181,6 +186,21 @@ public class AuthService : IAuthService
         //var subject = "Potwierdzenie rejestracji w WebVOD";
 
         //await _emailService.SendEmail(user.Email, subject, htmlBody);
+
+        _ = Task.Run(async () =>
+        {
+            var userData = new
+            {
+                Id = user.Id,
+                Login = user.Login
+            };
+
+            var json = JsonSerializer.Serialize(userData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            using var client = new HttpClient();
+            await client.PostAsync($"{recommendationsAPI}/add-channel", content);
+        });
     }
 
     public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)

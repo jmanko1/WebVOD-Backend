@@ -163,6 +163,27 @@ public class VideoController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/cancel-upload")]
+    public async Task<ActionResult<string>> CancelUpload(string id)
+    {
+        var sub = HttpContext.Session.GetString("UploadingSub");
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.CancelUpload(sub, id);
+
+            return Ok("Przesyłanie zostało przerwane.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
     [Authorize]
     [HttpPut("{id}/thumbnail")]
     [RequestSizeLimit(2097152)] // 2 MB
@@ -187,7 +208,7 @@ public class VideoController : ControllerBase
     }
 
     [HttpGet("categories")]
-    public async Task<ActionResult<List<string>>> GetCategories()
+    public ActionResult<List<string>> GetCategories()
     {
         var categories = Enum.GetNames(typeof(VideoCategory)).ToList();
         return Ok(categories);
