@@ -1,0 +1,11 @@
+﻿namespace WebVOD_Backend.Dtos.WatchTogether.Room;
+
+public class InitializeConnection
+{
+    public string VideoUrl { get; set; }
+    public string VideoTitle { get; set; }
+    public double InitialTime { get; set; }
+    public bool IsPlaying { get; set; }
+    public double? Countdown { get; set; }
+    public List<string> Participants { get; set; }
+}

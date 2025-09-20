@@ -1,67 +1,370 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using System.Collections.Concurrent;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using MongoDB.Bson;
+using WebVOD_Backend.Dtos.WatchTogether.Messages;
+using WebVOD_Backend.Dtos.WatchTogether.Participants;
+using WebVOD_Backend.Dtos.WatchTogether.Room;
+using WebVOD_Backend.Dtos.WatchTogether.Videos;
+using WebVOD_Backend.Model.WatchTogether;
+using WebVOD_Backend.Repositories.Interfaces;
 
 namespace WebVOD_Backend.Controllers;
 
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class WatchTogetherHub : Hub
 {
-    private static string currentVideoUrl = "";
-    private static double lastKnownVideoTime = 0;
-    private static bool isPlaying = false;
-    private static int participants = 0;
-    private static DateTime? playStartedAt = null;
+    private static readonly ConcurrentDictionary<Guid, Room> Rooms = new();
+    private static readonly ConcurrentDictionary<string, Guid> ConnectionToRoom = new();
+    private readonly IVideoRepository _videoRepository;
+
+    public WatchTogetherHub(IVideoRepository videoRepository)
+    {
+        _videoRepository = videoRepository;
+    }
+
+    public async Task<RoomCreatedDto> CreateRoom()
+    {
+        var login = GetLoginOrThrow();
+
+        var roomId = Guid.NewGuid();
+        var accessCode = GenerateAccessCode(6);
+
+        var room = new Room(roomId, accessCode);
+
+        lock (room.SyncRoot)
+        {
+            room.Participants[Context.ConnectionId] = login;
+            Rooms[roomId] = room;
+        }
+
+        ConnectionToRoom[Context.ConnectionId] = roomId;
+
+        var groupName = roomId.ToString();
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+        var initialize = new InitializeConnection
+        {
+            VideoUrl = room.CurrentVideoUrl,
+            VideoTitle = room.CurrentVideoTitle,
+            InitialTime = room.GetCurrentVideoTime(),
+            IsPlaying = room.IsPlaying,
+            Participants = room.GetParticipants()
+        };
+        await Clients.Caller.SendAsync("Initialize", initialize);
+
+        var createdRoom = new RoomCreatedDto
+        {
+            RoomId = roomId,
+            AccessCode = accessCode
+        };
+        return createdRoom;
+    }
+
+    public async Task JoinRoom(Guid roomId, string accessCode)
+    {
+        var login = GetLoginOrThrow();
+
+        if (!Rooms.TryGetValue(roomId, out var room))
+        {
+            throw new HubException("Nie znaleziono pokoju.");
+        }
+
+        if (!room.VerifyAccessCode(accessCode))
+        {
+            throw new HubException("Nieprawidłowy kod dostępu.");
+        }
+
+        lock (room.SyncRoot)
+        {
+            if (room.Participants.Count >= 3 && !room.Participants.ContainsKey(Context.ConnectionId))
+            {
+                throw new HubException("Pokój jest pełny (maks. 3 uczestników).");
+            }
+
+            if (room.Participants.Any(p => p.Value == login))
+            {
+                throw new HubException("Użytkownik już połączony z tym pokojem.");
+            }
+
+            room.Participants[Context.ConnectionId] = login;
+
+            Rooms[roomId] = room;
+        }
+
+        ConnectionToRoom[Context.ConnectionId] = roomId;
+
+        var groupName = roomId.ToString();
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+        var initialize = new InitializeConnection
+        {
+            VideoUrl = room.CurrentVideoUrl,
+            VideoTitle = room.CurrentVideoTitle,
+            InitialTime = room.GetCurrentVideoTime(),
+            IsPlaying = room.IsPlaying,
+            Participants = room.GetParticipants(),
+            Countdown = room.GetCountdown()
+        };
+
+        await Clients.Caller.SendAsync("Initialize", initialize);
+
+        var systemJoinMessage = new MessageDto
+        {
+            Login = "System",
+            Message = $"Użytkownik {login} dołączył do pokoju.",
+            MessageType = MessageType.SYSTEM.ToString(),
+            Timestamp = DateTime.UtcNow
+        };
+
+        await SendParticipantsList(roomId, systemJoinMessage);
+    }
 
     public async Task SetVideo(string videoUrl)
     {
-        currentVideoUrl = videoUrl;
-        lastKnownVideoTime = 0;
-        isPlaying = false;
-        playStartedAt = null;
+        var login = GetLoginOrThrow();
+        var roomId = EnsureInRoom(login);
 
-        await Clients.All.SendAsync("VideoChanged", videoUrl);
+        if (!Rooms.TryGetValue(roomId, out var room))
+        {
+            throw new HubException("Nie znaleziono pokoju.");
+        }
+
+        var uri = new Uri(videoUrl);
+        var videoId = Path.GetFileNameWithoutExtension(uri.AbsolutePath);
+
+        if (!ObjectId.TryParse(videoId, out _))
+        {
+            throw new HubException("Nie znaleziono filmu.");
+        }
+
+        var video = await _videoRepository.FindById(videoId);
+        if (video == null || video.Status != Model.VideoStatus.PUBLISHED)
+        {
+            throw new HubException("Nie znaleziono filmu.");
+        }
+
+        lock (room.SyncRoot)
+        {
+            room.IsPlaying = false;
+            room.CurrentVideoUrl = video.VideoPath ?? "";
+            room.CurrentVideoTitle = video.Title ?? "";
+            room.PlayStartedAt = null;
+            room.LastKnownVideoTime = 0;
+            room.CountdownStartedAt = DateTime.UtcNow;
+
+            Rooms[roomId] = room;
+        }
+
+        var videoChange = new VideoChangeDto
+        {
+            VideoUrl = room.CurrentVideoUrl,
+            Title = room.CurrentVideoTitle
+        };
+
+        var groupName = roomId.ToString();
+        await Clients.Group(groupName).SendAsync("VideoChanged", videoChange);
     }
 
-    public async Task PlayPause(bool playing)
+    public async Task PlayPause(bool playing, double time)
     {
-        isPlaying = playing;
-        playStartedAt = playing ? DateTime.UtcNow : null;
-        await Clients.All.SendAsync("PlayPause", playing);
+        var login = GetLoginOrThrow();
+        var roomId = EnsureInRoom(login);
+
+        if (!Rooms.TryGetValue(roomId, out var room))
+        {
+            throw new HubException("Nie znaleziono pokoju.");
+        }
+
+        lock (room.SyncRoot)
+        {
+            room.LastKnownVideoTime = time;
+            room.IsPlaying = playing;
+            room.PlayStartedAt = playing ? DateTime.UtcNow : null;
+            room.CountdownStartedAt = null;
+
+            Rooms[roomId] = room;
+        }
+
+        var groupName = roomId.ToString();
+        await Clients.OthersInGroup(groupName).SendAsync("PlayPause", playing);
     }
 
     public async Task Seek(double time)
     {
-        lastKnownVideoTime = time;
-        if (isPlaying)
-            playStartedAt = DateTime.UtcNow;
+        var login = GetLoginOrThrow();
+        var roomId = EnsureInRoom(login);
 
-        await Clients.All.SendAsync("Seek", time);
+        if (!Rooms.TryGetValue(roomId, out var room))
+        {
+            throw new HubException("Nie znaleziono pokoju.");
+        }
+
+        lock (room.SyncRoot)
+        {
+            room.LastKnownVideoTime = time;
+            if (room.IsPlaying)
+            {
+                room.PlayStartedAt = DateTime.UtcNow;
+            }
+
+            Rooms[roomId] = room;
+        }
+
+        var groupName = roomId.ToString();
+        await Clients.OthersInGroup(groupName).SendAsync("Seek", time);
     }
 
-    public override async Task OnConnectedAsync()
+    public async Task LeaveRoom()
     {
-        participants++;
-        await Clients.All.SendAsync("Participants", participants);
+        if (!ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
+            return;
 
-        var currentVideoTime = GetCurrentVideoTime();
-        await Clients.Caller.SendAsync("Initialize", currentVideoUrl, isPlaying, currentVideoTime);
+        await RemoveFromRoom(roomId, Context.ConnectionId);
+    }
 
-        await base.OnConnectedAsync();
+    public async Task SendMessage(string message)
+    {
+        var login = GetLoginOrThrow();
+
+        var roomId = EnsureInRoom(login);
+
+        if (message.Length == 0 || string.IsNullOrWhiteSpace(message))
+        {
+            throw new HubException("Podaj treść wiadomości");
+        }
+
+        if (message.Length > 200)
+        {
+            throw new HubException("Wiadomość może mieć maksymalnie 200 znaków.");
+        }
+
+        var messageDto = new MessageDto
+        {
+            Login = login,
+            Message = message,
+            MessageType = MessageType.USER.ToString(),
+            Timestamp = DateTime.UtcNow
+        };
+
+        var groupName = roomId.ToString();
+        await Clients.OthersInGroup(groupName).SendAsync("ReceiveMessage", messageDto);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        participants = Math.Max(0, participants - 1);
-        await Clients.Others.SendAsync("Participants", participants);
+        if (ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
+        {
+            await RemoveFromRoom(roomId, Context.ConnectionId);
+        }
+
         await base.OnDisconnectedAsync(exception);
     }
 
-    private double GetCurrentVideoTime()
+    private Guid EnsureInRoom(string login)
     {
-        if (isPlaying && playStartedAt.HasValue)
+        if (!ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
         {
-            var elapsed = (DateTime.UtcNow - playStartedAt.Value).TotalSeconds;
-            return lastKnownVideoTime + elapsed;
+            throw new HubException("Użytkownik nie jest połączony z żadnym pokojem.");
         }
 
-        return lastKnownVideoTime;
+        if (!Rooms.TryGetValue(roomId, out var room))
+        {
+            throw new HubException("Nie znaleziono pokoju.");
+        }
+
+        if (!room.Participants.TryGetValue(Context.ConnectionId, out var participantLogin))
+        {
+            throw new HubException("Użytkownik nie jest członkiem tego pokoju.");
+        }
+
+        if (participantLogin != login)
+        {
+            throw new HubException("Nieprawidłowy login.");
+        }
+
+        return roomId;
+    }
+
+    private string GenerateAccessCode(int length)
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var bytes = RandomNumberGenerator.GetBytes(length);
+        var sb = new StringBuilder(length);
+
+        foreach (var b in bytes)
+        {
+            sb.Append(alphabet[b % alphabet.Length]);
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task SendParticipantsList(Guid roomId, MessageDto message)
+    {
+        if (!Rooms.TryGetValue(roomId, out var room)) return;
+
+        var dto = new ParticipantsUpdateDto
+        {
+            Participants = room.GetParticipants(),
+            Message = message
+        };
+
+        await Clients.OthersInGroup(roomId.ToString()).SendAsync("ParticipantsUpdate", dto);
+    }
+
+    private async Task RemoveFromRoom(Guid roomId, string connectionId)
+    {
+        if (!Rooms.TryGetValue(roomId, out var room))
+            return;
+
+        var groupName = roomId.ToString();
+        await Groups.RemoveFromGroupAsync(connectionId, groupName);
+
+        ConnectionToRoom.TryRemove(connectionId, out _);
+
+        string leavingLogin = string.Empty;
+
+        lock (room.SyncRoot)
+        {
+            
+            room.Participants.Remove(connectionId, out var login);
+
+            if (room.Participants.Count == 0)
+            {
+                Rooms.TryRemove(roomId, out _);
+                return;
+            }
+
+            Rooms[roomId] = room;
+            leavingLogin = login;
+        }
+
+        var systemLeaveMessage = new MessageDto
+        {
+            Login = "System",
+            Message = $"Użytkownik {leavingLogin} opuścił pokój.",
+            MessageType = MessageType.SYSTEM.ToString(),
+            Timestamp = DateTime.UtcNow
+        };
+
+        await SendParticipantsList(roomId, systemLeaveMessage);
+    }
+
+    private string GetLoginOrThrow()
+    {
+        var user = Context.User;
+        var login = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (login == null)
+        {
+            throw new HubException("Użytkownik niezalogowany.");
+        }
+
+        return login;
     }
 }
