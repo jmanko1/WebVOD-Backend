@@ -2,7 +2,7 @@
 
 public class RequestErrorException : Exception
 {
-    public RequestErrorException(int code, string? message) : base(message)
+    public RequestErrorException(int code, string message = "") : base(message)
     {
         StatusCode = code;
     }

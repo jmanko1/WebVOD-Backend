@@ -37,7 +37,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -66,7 +66,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (string.IsNullOrWhiteSpace(createVideoDto.Title))
@@ -124,7 +124,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -274,7 +274,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -311,7 +311,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -334,7 +334,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -369,7 +369,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -428,7 +428,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))
@@ -508,7 +508,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (chunk == null || chunk.Length == 0)
@@ -636,7 +636,7 @@ public class VideoService : IVideoService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(id, out _))

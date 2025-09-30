@@ -30,7 +30,7 @@ public class CommentService : ICommentService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(newCommentDto.VideoId, out _))
@@ -62,7 +62,7 @@ public class CommentService : ICommentService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!ObjectId.TryParse(commentId, out _))
