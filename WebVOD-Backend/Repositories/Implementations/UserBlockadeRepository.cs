@@ -30,4 +30,14 @@ public class UserBlockadeRepository : IUserBlockadeRepository
 
         return await _userBlockades.Find(filter).AnyAsync();
     }
+
+    public async Task<bool> ExistsByUserIdAndSourceIP(string userId, string sourceIP)
+    {
+        var builder = Builders<UserBlockade>.Filter;
+        var filter = builder.Eq(b => b.UserId, userId) &
+                     builder.Eq(b => b.SourceIP, sourceIP) &
+                     builder.Gt(b => b.Until, DateTime.UtcNow);
+
+        return await _userBlockades.Find(filter).AnyAsync();
+    }
 }

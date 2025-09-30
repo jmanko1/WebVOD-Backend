@@ -11,7 +11,11 @@ public class UserBlockade
     public string Id { get; set; }
 
     [Required]
+    [BsonRepresentation(BsonType.ObjectId)]
     public string UserId { get; set; }
+
+    [Required]
+    public string SourceIP { get; set; }
 
     [Required]
     public DateTime Since { get; set; } = DateTime.UtcNow;
