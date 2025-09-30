@@ -11,6 +11,7 @@ public class FailedLoginLog
     public string Id { get; set; }
 
     [Required]
+    [BsonRepresentation(BsonType.ObjectId)]
     public string UserId { get; set; }
 
     [Required]
