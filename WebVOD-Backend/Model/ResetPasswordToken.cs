@@ -20,5 +20,5 @@ public class ResetPasswordToken
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Required]
-    public DateTime ValidUntil { get; set; } = DateTime.UtcNow.AddMinutes(15);
+    public DateTime ValidUntil { get; set; } = DateTime.UtcNow.AddMinutes(20);
 }
