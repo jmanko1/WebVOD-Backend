@@ -2,7 +2,6 @@
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using Newtonsoft.Json.Linq;
 using WebVOD_Backend.Repositories.Interfaces;
 using WebVOD_Backend.Services.Interfaces;
 
