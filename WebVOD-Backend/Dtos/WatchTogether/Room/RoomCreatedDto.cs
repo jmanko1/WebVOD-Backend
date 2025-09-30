@@ -2,6 +2,6 @@
 
 public class RoomCreatedDto
 {
-    public Guid RoomId { get; set; }
+    public string RoomId { get; set; }
     public string AccessCode { get; set; }
 }

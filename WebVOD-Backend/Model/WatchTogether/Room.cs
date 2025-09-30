@@ -2,7 +2,7 @@
 
 public class Room
 {
-    public Guid Id { get; }
+    public string Id { get; }
     public string AccessCode { get; }
 
     public string CurrentVideoUrl { get; set; } = string.Empty;
@@ -15,7 +15,7 @@ public class Room
     public Dictionary<string, string> Participants { get; set; } = new();
     public object SyncRoot { get; } = new();
 
-    public Room(Guid id, string accessCode)
+    public Room(string id, string accessCode)
     {
         Id = id;
         AccessCode = accessCode;

@@ -18,8 +18,8 @@ namespace WebVOD_Backend.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class WatchTogetherHub : Hub
 {
-    private static readonly ConcurrentDictionary<Guid, Room> Rooms = new();
-    private static readonly ConcurrentDictionary<string, Guid> ConnectionToRoom = new();
+    private static readonly ConcurrentDictionary<string, Room> Rooms = new();
+    private static readonly ConcurrentDictionary<string, string> ConnectionToRoom = new();
     private readonly IVideoRepository _videoRepository;
 
     public WatchTogetherHub(IVideoRepository videoRepository)
@@ -31,7 +31,12 @@ public class WatchTogetherHub : Hub
     {
         var login = GetLoginOrThrow();
 
-        var roomId = Guid.NewGuid();
+        var roomId = GenerateRoomId();
+        while (Rooms.ContainsKey(roomId))
+        {
+            roomId = GenerateRoomId();
+        }
+
         var accessCode = GenerateAccessCode(6);
 
         var room = new Room(roomId, accessCode);
@@ -65,7 +70,7 @@ public class WatchTogetherHub : Hub
         return createdRoom;
     }
 
-    public async Task JoinRoom(Guid roomId, string accessCode)
+    public async Task JoinRoom(string roomId, string accessCode)
     {
         var login = GetLoginOrThrow();
 
@@ -162,6 +167,7 @@ public class WatchTogetherHub : Hub
 
         var videoChange = new VideoChangeDto
         {
+            Id = video.Id,
             VideoUrl = room.CurrentVideoUrl,
             Title = room.CurrentVideoTitle
         };
@@ -265,7 +271,7 @@ public class WatchTogetherHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    private Guid EnsureInRoom(string login)
+    private string EnsureInRoom(string login)
     {
         if (!ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
         {
@@ -290,6 +296,20 @@ public class WatchTogetherHub : Hub
         return roomId;
     }
 
+    private string GenerateRoomId(int length = 12)
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var bytes = RandomNumberGenerator.GetBytes(length);
+        var sb = new StringBuilder(length);
+
+        foreach (var b in bytes)
+        {
+            sb.Append(alphabet[b % alphabet.Length]);
+        }
+
+        return sb.ToString();
+    }
+
     private string GenerateAccessCode(int length)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -304,7 +324,7 @@ public class WatchTogetherHub : Hub
         return sb.ToString();
     }
 
-    private async Task SendParticipantsList(Guid roomId, MessageDto message)
+    private async Task SendParticipantsList(string roomId, MessageDto message)
     {
         if (!Rooms.TryGetValue(roomId, out var room)) return;
 
@@ -317,7 +337,7 @@ public class WatchTogetherHub : Hub
         await Clients.OthersInGroup(roomId.ToString()).SendAsync("ParticipantsUpdate", dto);
     }
 
-    private async Task RemoveFromRoom(Guid roomId, string connectionId)
+    private async Task RemoveFromRoom(string roomId, string connectionId)
     {
         if (!Rooms.TryGetValue(roomId, out var room))
             return;
