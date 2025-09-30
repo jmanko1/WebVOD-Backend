@@ -320,6 +320,48 @@ public class UserController : ControllerBase
         }
     }
 
+    [Authorize]
+    [HttpDelete("my-profile/description")]
+    public async Task<ActionResult> DeleteDescription()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.DeleteDescription(sub);
+            return Ok("Opis kanału został usunięty.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpDelete("my-profile/image")]
+    public async Task<ActionResult> DeleteImage()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _userService.DeleteImage(sub);
+            return Ok("Zdjęcie kanału zostało usunięte.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<User>>> GetAll()
     {

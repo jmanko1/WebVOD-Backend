@@ -33,7 +33,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if(user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         return mapUserDtoFromUser(user);
@@ -75,7 +75,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if(user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         return user.Email;
@@ -91,7 +91,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if(user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         await _userRepository.UpdateDescription(user.Id, description);
@@ -102,7 +102,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (image == null || image.Length == 0)
@@ -120,7 +120,7 @@ public class UserService : IUserService
             throw new RequestErrorException(400, "Zdjęcie profilowe musi być w formacie WebP.");
         }
 
-        if (user.ImageUrl != null)
+        if (!string.IsNullOrEmpty(user.ImageUrl))
         {
             var fileNameToDelete = Path.GetFileName(user.ImageUrl);
             _filesService.DeleteProfileImage(fileNameToDelete);
@@ -141,7 +141,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         return user.IsTFAEnabled;
@@ -152,7 +152,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!_cryptoService.VerifyPassword(changePasswordDto.OldPassword, user.Password))
@@ -196,7 +196,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (user.IsTFAEnabled)
@@ -212,7 +212,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         if (!_cryptoService.VerifyPassword(toggleTFADto.Password, user.Password))
@@ -257,7 +257,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         var videos = await _videoRepository.FindByUserId(user.Id, page, size, titlePattern, false);
@@ -281,7 +281,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         var likes = await _likeRepository.FindByUserId(user.Id, page, size);
@@ -321,7 +321,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         var historyElements = await _watchingHistoryElementRepository.FindByViewerId(user.Id, page, size);
@@ -360,7 +360,7 @@ public class UserService : IUserService
         var user = await _userRepository.FindByLogin(sub);
         if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         await _watchingHistoryElementRepository.DeleteByViewerId(user.Id);
@@ -382,5 +382,33 @@ public class UserService : IUserService
         }).ToList();
 
         return userDtos;
+    }
+
+    public async Task DeleteDescription(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        await _userRepository.UpdateDescription(user.Id, string.Empty);
+    }
+
+    public async Task DeleteImage(string sub)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!string.IsNullOrEmpty(user.ImageUrl))
+        {
+            var fileNameToDelete = Path.GetFileName(user.ImageUrl);
+            _filesService.DeleteProfileImage(fileNameToDelete);
+        }
+
+        await _userRepository.UpdateImageUrl(user.Id, string.Empty);
     }
 }

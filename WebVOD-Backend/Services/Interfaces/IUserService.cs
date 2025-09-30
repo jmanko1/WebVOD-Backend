@@ -21,5 +21,7 @@ public interface IUserService
     Task<List<UserVideoActivityDto>> GetViewedVideos(string sub, int page, int size);
     Task ClearHistory(string sub);
     Task<List<SearchUserDto>> SearchUsers(string query, int page, int size);
+    Task DeleteDescription(string sub);
+    Task DeleteImage(string sub);
     Task<List<User>> GetAll();
 }
