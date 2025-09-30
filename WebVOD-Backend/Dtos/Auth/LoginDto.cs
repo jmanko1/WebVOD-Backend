@@ -18,5 +18,8 @@ public class LoginDto
     )]
     public string Password { get; set; }
 
+    [Required(ErrorMessage = "Potwierdź, że nie jesteś robotem.")]
+    public string CaptchaToken { get; set; }
+
     public bool CheckedSave { get; set; }
 }

@@ -83,18 +83,12 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("Reset-Password")]
-    public async Task<ActionResult> InitiateResetPassword(
-        [FromBody]
-        [Required(ErrorMessage = "Podaj adres email.")]
-        [EmailAddress(ErrorMessage = "Podaj prawidłowy adres email.")]
-        [MaxLength(80, ErrorMessage = "Adres email może mieć maksymalnie 80 znaków.")]
-        string email
-    )
+    public async Task<ActionResult> InitiateResetPassword([FromBody] InitiateResetPasswordDto initiateResetPasswordDto)
     {
         try
         {
-            await _authService.InitiateResetPassword(email);
-            return Ok("Wysłano maila z linkiem resetującym hasło na adres " + email + ".");
+            await _authService.InitiateResetPassword(initiateResetPasswordDto);
+            return Ok("Wysłano maila z linkiem resetującym hasło na adres " + initiateResetPasswordDto.Email + ".");
         }
         catch (RequestErrorException ex)
         {

@@ -26,4 +26,7 @@ public class RegisterDto
     [Required(ErrorMessage = "Potwierdź hasło.")]
     [Compare("Password", ErrorMessage = "Podane hasła nie są identyczne.")]
     public string ConfirmPassword { get; set; }
+
+    [Required(ErrorMessage = "Potwierdź, że nie jesteś robotem.")]
+    public string CaptchaToken { get; set; }
 }

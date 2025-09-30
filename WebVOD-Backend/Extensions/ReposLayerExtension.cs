@@ -1,5 +1,7 @@
 ﻿using WebVOD_Backend.Repositories.Implementations;
 using WebVOD_Backend.Repositories.Interfaces;
+using WebVOD_Backend.Services.Implementations;
+using WebVOD_Backend.Services.Interfaces;
 
 namespace WebVOD_Backend.Extensions;
 
@@ -17,6 +19,7 @@ public static class ReposLayerExtension
         services.AddScoped<ILikeRepository, LikeRepository>();
         services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
         services.AddScoped<IWatchingHistoryElementRepository, WatchingHistoryElementRepository>();
+        services.AddScoped<ICaptchaService, CaptchaService>();
 
         return services;
     }

@@ -1,7 +1,7 @@
-﻿using System.Security.Claims;
+﻿using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.SignalR;
 using OtpNet;
 using WebVOD_Backend.Dtos.Auth;
 using WebVOD_Backend.Exceptions;
@@ -21,6 +21,7 @@ public class AuthService : IAuthService
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
     private readonly IBlacklistedTokenRepository _blacklistedTokenRepository;
     private readonly IEmailService _emailService;
+    private readonly ICaptchaService _captchaService;
 
     private const int MaxTimeSpanMinutes = 1;
     private const int MaxFailedAttempts = 5;
@@ -29,7 +30,7 @@ public class AuthService : IAuthService
     private const string recommendationsAPI = "http://localhost:5000";
 
 
-    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository, IEmailService emailService)
+    public AuthService(IUserRepository userRepository, IFailedLoginLogRepository failedLoginLogRepository, IUserBlockadeRepository blockadeRepository, ICryptoService cryptoService, IJwtService jwtService, IResetPasswordTokenRepository resetPasswordTokenRepository, IBlacklistedTokenRepository blacklistedTokenRepository, IEmailService emailService, ICaptchaService captchaService)
     {
         _userRepository = userRepository;
         _failedLoginLogRepository = failedLoginLogRepository;
@@ -39,6 +40,7 @@ public class AuthService : IAuthService
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
         _blacklistedTokenRepository = blacklistedTokenRepository;
         _emailService = emailService;
+        _captchaService = captchaService;
     }
 
     public async Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -46,18 +48,22 @@ public class AuthService : IAuthService
         ClearTfaSession(httpContext);
 
         var user = await GetUserByLoginSecurely(loginDto.Login, loginDto.Password);
-
-        await EnsureAccountNotBlocked(user.Id);
-
-        var sourceIP = httpContext.Connection.RemoteIpAddress.ToString();
+        var sourceIP = httpContext.Connection.RemoteIpAddress?.ToString() ?? "Nieznany";
         var sourceDevice = httpRequest.Headers["User-Agent"].ToString();
+
+        await EnsureAccountNotBlocked(user.Id, sourceIP);
 
         if (!_cryptoService.VerifyPassword(loginDto.Password, user.Password))
         {
             await HandleFailedLogin(user.Id, sourceIP, sourceDevice);
             throw new RequestErrorException(401, "Niepoprawny login lub hasło.");
         }
-        
+
+        if (!await _captchaService.VerifyCaptchaToken(loginDto.CaptchaToken))
+        {
+            throw new RequestErrorException(400, "Potwierdź, że nie jesteś robotem.");
+        }
+
         if (!user.IsTFAEnabled)
         {
             if(loginDto.CheckedSave)
@@ -97,10 +103,13 @@ public class AuthService : IAuthService
         return user;
     }
 
-    private async Task EnsureAccountNotBlocked(string userId)
+    private async Task EnsureAccountNotBlocked(string userId, string sourceIP)
     {
-        if (await _blockadeRepository.ExistsByUserId(userId))
+        if (await _blockadeRepository.ExistsByUserIdAndSourceIP(userId, sourceIP))
         {
+            var dummyHash = "uWkxn6xDKyoHq0vH1PCZnpuhF0r5NrsBuxybA1u3J";
+            var password = "abc123";
+            _cryptoService.VerifyPassword(password, dummyHash);
             throw new RequestErrorException(403, "To konto jest w tej chwili zablokowane. Spróbuj ponownie później.");
         }
     }
@@ -121,7 +130,8 @@ public class AuthService : IAuthService
         {
             var blockade = new UserBlockade
             {
-                UserId = userId
+                UserId = userId,
+                SourceIP = ip
             };
 
             await _blockadeRepository.Add(blockade);
@@ -131,7 +141,7 @@ public class AuthService : IAuthService
     private void SaveTfaSession(HttpContext context, string userId, bool checkedSave)
     {
         context.Session.SetString("auth_userId", userId);
-        context.Session.SetString("auth_dateUntil", DateTime.UtcNow.AddMinutes(TFASessionLifetime).ToString());
+        context.Session.SetString("auth_dateUntil", DateTime.UtcNow.AddMinutes(TFASessionLifetime).ToString("o", CultureInfo.InvariantCulture));
         context.Session.SetInt32("auth_attempts", 0);
         context.Session.SetInt32("auth_checkedSave", checkedSave ? 1 : 0);
     }
@@ -157,6 +167,7 @@ public class AuthService : IAuthService
 
     public async Task Register(RegisterDto registerDto)
     {
+
         if (await _userRepository.ExistsByLogin(registerDto.Login))
         {
             throw new RequestErrorException(400, "Ten login jest zajęty.");
@@ -167,17 +178,22 @@ public class AuthService : IAuthService
             throw new RequestErrorException(400, "Ten adres email jest zajęty.");
         }
 
-        var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
-
-        var user = new User
+        if (!await _captchaService.VerifyCaptchaToken(registerDto.CaptchaToken))
         {
-            Login = registerDto.Login,
-            Email = registerDto.Email,
-            Password = _cryptoService.HashPassword(registerDto.Password),
-            TOTPKey = _cryptoService.Encrypt(otpKey)
-        };
+            throw new RequestErrorException(400, "Potwierdź, że nie jesteś robotem.");
+        }
 
-        await _userRepository.Add(user);
+        //var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
+
+        //var user = new User
+        //{
+        //    Login = registerDto.Login,
+        //    Email = registerDto.Email,
+        //    Password = _cryptoService.HashPassword(registerDto.Password),
+        //    TOTPKey = _cryptoService.Encrypt(otpKey)
+        //};
+
+        //await _userRepository.Add(user);
 
         //var templatePath = Path.Combine("Templates", "WelcomeEmail.html");
         //var htmlBody = File.ReadAllText(templatePath);
@@ -187,20 +203,21 @@ public class AuthService : IAuthService
 
         //await _emailService.SendEmail(user.Email, subject, htmlBody);
 
-        _ = Task.Run(async () =>
-        {
-            var userData = new
-            {
-                Id = user.Id,
-                Login = user.Login
-            };
+        //_ = Task.Run(async () =>
+        //{
+        //    var userData = new
+        //    {
+        //        Id = user.Id,
+        //        Login = user.Login
+        //    };
 
-            var json = JsonSerializer.Serialize(userData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+        //    var json = JsonSerializer.Serialize(userData);
+        //    var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            using var client = new HttpClient();
-            await client.PostAsync($"{recommendationsAPI}/add-channel", content);
-        });
+        //    using var client = new HttpClient();
+
+        //    await client.PostAsync($"{recommendationsAPI}/add-channel", content);
+        //});
     }
 
     public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -213,7 +230,7 @@ public class AuthService : IAuthService
 
         var dateUntil = httpContext.Session.GetString("auth_dateUntil");
 
-        if (DateTime.TryParse(dateUntil, out DateTime result))
+        if (DateTime.TryParseExact(dateUntil, "o", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime result))
         {
             if(result < DateTime.UtcNow)
             {
@@ -226,22 +243,22 @@ public class AuthService : IAuthService
         }
 
         var user = await _userRepository.FindById(userId);
-        if(user == null)
+        if (user == null)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje. Rozpocznij proces logowania od nowa.");
+            throw new RequestErrorException(401, "Rozpocznij proces logowania od nowa.");
         }
 
-        await EnsureAccountNotBlocked(user.Id);
-
-        var sourceIP = httpContext.Connection.RemoteIpAddress?.ToString();
+        var sourceIP = httpContext.Connection.RemoteIpAddress?.ToString() ?? "Nieznany";
         var sourceDevice = httpRequest.Headers["User-Agent"].ToString();
+
+        await EnsureAccountNotBlocked(user.Id, sourceIP);
 
         var secretKey = _cryptoService.Decrypt(user.TOTPKey);
 
         if (!ValidateTotp(secretKey, code))
         {
-            var attempts = (int)httpContext.Session.GetInt32("auth_attempts") + 1;
-            if(attempts >= MaxTFACodeAttempts)
+            var attempts = (httpContext.Session.GetInt32("auth_attempts") ?? 0) + 1;
+            if (attempts >= MaxTFACodeAttempts)
             {
                 ClearTfaSession(httpContext);
 
@@ -278,12 +295,17 @@ public class AuthService : IAuthService
         return totp.VerifyTotp(userInput, out _, new VerificationWindow(previous: 1, future: 0));
     }
 
-    public async Task InitiateResetPassword(string email)
+    public async Task InitiateResetPassword(InitiateResetPasswordDto initiateResetPasswordDto)
     {
-        var user = await _userRepository.FindByEmail(email);
+        if (!await _captchaService.VerifyCaptchaToken(initiateResetPasswordDto.CaptchaToken))
+        {
+            throw new RequestErrorException(400, "Potwierdź, że nie jesteś robotem.");
+        }
+
+        var user = await _userRepository.FindByEmail(initiateResetPasswordDto.Email);
         if(user == null)
         {
-            throw new RequestErrorException(401, "Podany adres email nie jest zarejestrowany.");
+            return;
         }
 
         await _resetPasswordTokenRepository.RemoveByUserId(user.Id);
@@ -296,12 +318,13 @@ public class AuthService : IAuthService
         };
 
         await _resetPasswordTokenRepository.Add(resetPasswordToken);
+        Console.WriteLine(token);
 
         //var templatePath = Path.Combine("Templates", "ResetPasswordEmail.html");
         //var htmlBody = File.ReadAllText(templatePath);
         //htmlBody = htmlBody.Replace("[USER]", user.Login)
         //                   .Replace("[RESET_URL]", $"http://localhost:3000/reset-password/{token}")
-        //                   .Replace("[CZAS]", "15");
+        //                   .Replace("[CZAS]", "20");
         //var subject = "Resetowanie hasła w WebVOD";
 
         //await _emailService.SendEmail(user.Email, subject, htmlBody);
@@ -313,19 +336,19 @@ public class AuthService : IAuthService
         var resetPasswordToken = await _resetPasswordTokenRepository.FindByToken(sha256Token);
         if(resetPasswordToken == null)
         {
-            throw new RequestErrorException(401, "Nieprawidłowy token.");
+            throw new RequestErrorException(401, "Nieprawidłowy link resetujący hasło.");
         }
 
         if(resetPasswordToken.ValidUntil < DateTime.UtcNow)
         {
-            throw new RequestErrorException(401, "Token wygasł. Rozpocznij od nowa proces resetowania hasła.");
+            throw new RequestErrorException(401, "Link wygasł. Rozpocznij od nowa proces resetowania hasła.");
         }
 
         var userExists = await _userRepository.ExistsById(resetPasswordToken.UserId);
         if(!userExists)
         {
             await _resetPasswordTokenRepository.RemoveById(resetPasswordToken.Id);
-            throw new RequestErrorException(401, "Nieprawidłowy token.");
+            throw new RequestErrorException(401, "Nieprawidłowy link resetujący hasło.");
         }
 
         var newPassword = _cryptoService.HashPassword(resetPasswordDto.Password);
@@ -337,25 +360,25 @@ public class AuthService : IAuthService
     {
         if (string.IsNullOrEmpty(refreshToken))
         {
-            throw new RequestErrorException(401, "Brak tokenu.");
+            throw new RequestErrorException(401);
         }
 
         var principal = await _jwtService.ValidateRefreshToken(refreshToken);
         if (principal == null)
         {
-            throw new RequestErrorException(401, "Nieprawidłowy token.");
+            throw new RequestErrorException(401);
         }
 
         var login = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(login))
         {
-            throw new RequestErrorException(401, "Nieprawidłowy token.");
+            throw new RequestErrorException(401);
         }
 
         var userExists = await _userRepository.ExistsByLogin(login);
         if (!userExists)
         {
-            throw new RequestErrorException(401, "Użytkownik nie istnieje.");
+            throw new RequestErrorException(401);
         }
 
         return GenerateLoginResponse(login);
@@ -378,7 +401,7 @@ public class AuthService : IAuthService
             var principal = await _jwtService.ValidateRefreshToken(refreshToken);
             if (principal == null)
             {
-                throw new RequestErrorException(401, "Nieprawidłowy refresh token.");
+                throw new RequestErrorException(401);
             }
 
             var refreshJti = _jwtService.GetJti(refreshToken);

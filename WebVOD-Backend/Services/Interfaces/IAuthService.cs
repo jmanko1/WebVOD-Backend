@@ -7,7 +7,7 @@ public interface IAuthService
     Task Register(RegisterDto registerDto);
     Task<LoginResponseDto> Authenticate(LoginDto loginDto, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse);
     Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse);
-    Task InitiateResetPassword(string email);
+    Task InitiateResetPassword(InitiateResetPasswordDto initiateResetPasswordDto);
     Task ResetPassword(ResetPasswordDto resetPasswordDto);
     Task<LoginResponseDto> Refresh(string refreshToken);
     Task Logout(string accessToken, string refreshToken);
