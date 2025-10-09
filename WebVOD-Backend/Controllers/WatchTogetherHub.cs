@@ -49,8 +49,7 @@ public class WatchTogetherHub : Hub
 
         ConnectionToRoom[Context.ConnectionId] = roomId;
 
-        var groupName = roomId.ToString();
-        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
         var initialize = new InitializeConnection
         {
@@ -97,14 +96,12 @@ public class WatchTogetherHub : Hub
             }
 
             room.Participants[Context.ConnectionId] = login;
-
             Rooms[roomId] = room;
         }
 
         ConnectionToRoom[Context.ConnectionId] = roomId;
 
-        var groupName = roomId.ToString();
-        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
         var initialize = new InitializeConnection
         {
@@ -172,8 +169,7 @@ public class WatchTogetherHub : Hub
             Title = room.CurrentVideoTitle
         };
 
-        var groupName = roomId.ToString();
-        await Clients.Group(groupName).SendAsync("VideoChanged", videoChange);
+        await Clients.Group(roomId).SendAsync("VideoChanged", videoChange);
     }
 
     public async Task PlayPause(bool playing, double time)
@@ -196,8 +192,7 @@ public class WatchTogetherHub : Hub
             Rooms[roomId] = room;
         }
 
-        var groupName = roomId.ToString();
-        await Clients.OthersInGroup(groupName).SendAsync("PlayPause", playing);
+        await Clients.OthersInGroup(roomId).SendAsync("PlayPause", playing);
     }
 
     public async Task Seek(double time)
@@ -221,8 +216,7 @@ public class WatchTogetherHub : Hub
             Rooms[roomId] = room;
         }
 
-        var groupName = roomId.ToString();
-        await Clients.OthersInGroup(groupName).SendAsync("Seek", time);
+        await Clients.OthersInGroup(roomId).SendAsync("Seek", time);
     }
 
     public async Task LeaveRoom()
@@ -257,8 +251,7 @@ public class WatchTogetherHub : Hub
             Timestamp = DateTime.UtcNow
         };
 
-        var groupName = roomId.ToString();
-        await Clients.OthersInGroup(groupName).SendAsync("ReceiveMessage", messageDto);
+        await Clients.OthersInGroup(roomId).SendAsync("ReceiveMessage", messageDto);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -334,7 +327,7 @@ public class WatchTogetherHub : Hub
             Message = message
         };
 
-        await Clients.OthersInGroup(roomId.ToString()).SendAsync("ParticipantsUpdate", dto);
+        await Clients.OthersInGroup(roomId).SendAsync("ParticipantsUpdate", dto);
     }
 
     private async Task RemoveFromRoom(string roomId, string connectionId)
@@ -342,19 +335,17 @@ public class WatchTogetherHub : Hub
         if (!Rooms.TryGetValue(roomId, out var room))
             return;
 
-        var groupName = roomId.ToString();
-        await Groups.RemoveFromGroupAsync(connectionId, groupName);
+        await Groups.RemoveFromGroupAsync(connectionId, roomId);
 
         ConnectionToRoom.TryRemove(connectionId, out _);
 
-        string leavingLogin = string.Empty;
+        var leavingLogin = string.Empty;
 
         lock (room.SyncRoot)
         {
-            
             room.Participants.Remove(connectionId, out var login);
 
-            if (room.Participants.Count == 0)
+            if (room.Participants.Count <= 0)
             {
                 Rooms.TryRemove(roomId, out _);
                 return;
