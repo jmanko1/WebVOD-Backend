@@ -23,10 +23,10 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ICaptchaService _captchaService;
 
-    private const int MaxTimeSpanMinutes = 1;
-    private const int MaxFailedAttempts = 5;
+    private const int MaxTimeSpanMinutes = 10;
+    private const int MaxFailedAttempts = 6;
     private const int TFASessionLifetime = 5;
-    private const int MaxTFACodeAttempts = 2;
+    private const int MaxTFACodeAttempts = 3;
     private const string recommendationsAPI = "http://localhost:5000";
 
 
@@ -49,7 +49,7 @@ public class AuthService : IAuthService
 
         var user = await GetUserByLoginSecurely(loginDto.Login, loginDto.Password);
         var sourceIP = httpContext.Connection.RemoteIpAddress?.ToString() ?? "Nieznany";
-        var sourceDevice = httpRequest.Headers["User-Agent"].ToString();
+        var sourceDevice = httpRequest.Headers["User-Agent"].ToString() ?? "Nieznany";
 
         await EnsureAccountNotBlocked(user.Id, sourceIP);
 
@@ -59,14 +59,9 @@ public class AuthService : IAuthService
             throw new RequestErrorException(401, "Niepoprawny login lub hasło.");
         }
 
-        if (!await _captchaService.VerifyCaptchaToken(loginDto.CaptchaToken))
-        {
-            throw new RequestErrorException(400, "Potwierdź, że nie jesteś robotem.");
-        }
-
         if (!user.IsTFAEnabled)
         {
-            if(loginDto.CheckedSave)
+            if (loginDto.CheckedSave)
             {
                 SaveRefreshTokenCookie(httpResponse, user.Login);
             }
@@ -86,16 +81,17 @@ public class AuthService : IAuthService
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
             Expires = DateTime.UtcNow.AddDays(_jwtService.GetRefreshTokenLifetime())
+            //Secure = true
         });
     }
 
     private async Task<User> GetUserByLoginSecurely(string login, string password)
     {
         var user = await _userRepository.FindByLogin(login);
-        var dummyHash = "uWkxn6xDKyoHq0vH1PCZnpuhF0r5NrsBuxybA1u3J";
 
         if (user == null)
         {
+            var dummyHash = "uWkxn6xDKyoHq0vH1PCZnpuhF0r5NrsBuxybA1u3J";
             _cryptoService.VerifyPassword(password, dummyHash);
             throw new RequestErrorException(401, "Nieprawidłowy login lub hasło.");
         }
@@ -183,17 +179,17 @@ public class AuthService : IAuthService
             throw new RequestErrorException(400, "Potwierdź, że nie jesteś robotem.");
         }
 
-        //var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
+        var otpKey = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
 
-        //var user = new User
-        //{
-        //    Login = registerDto.Login,
-        //    Email = registerDto.Email,
-        //    Password = _cryptoService.HashPassword(registerDto.Password),
-        //    TOTPKey = _cryptoService.Encrypt(otpKey)
-        //};
+        var user = new User
+        {
+            Login = registerDto.Login,
+            Email = registerDto.Email,
+            Password = _cryptoService.HashPassword(registerDto.Password),
+            TOTPKey = _cryptoService.Encrypt(otpKey)
+        };
 
-        //await _userRepository.Add(user);
+        await _userRepository.Add(user);
 
         //var templatePath = Path.Combine("Templates", "WelcomeEmail.html");
         //var htmlBody = File.ReadAllText(templatePath);
@@ -203,21 +199,21 @@ public class AuthService : IAuthService
 
         //await _emailService.SendEmail(user.Email, subject, htmlBody);
 
-        //_ = Task.Run(async () =>
-        //{
-        //    var userData = new
-        //    {
-        //        Id = user.Id,
-        //        Login = user.Login
-        //    };
+        _ = Task.Run(async () =>
+        {
+            var userData = new
+            {
+                Id = user.Id,
+                Login = user.Login
+            };
 
-        //    var json = JsonSerializer.Serialize(userData);
-        //    var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var json = JsonSerializer.Serialize(userData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        //    using var client = new HttpClient();
+            using var client = new HttpClient();
 
-        //    await client.PostAsync($"{recommendationsAPI}/add-channel", content);
-        //});
+            await client.PostAsync($"{recommendationsAPI}/add-channel", content);
+        });
     }
 
     public async Task<LoginResponseDto> Code(string code, HttpContext httpContext, HttpRequest httpRequest, HttpResponse httpResponse)
@@ -249,7 +245,7 @@ public class AuthService : IAuthService
         }
 
         var sourceIP = httpContext.Connection.RemoteIpAddress?.ToString() ?? "Nieznany";
-        var sourceDevice = httpRequest.Headers["User-Agent"].ToString();
+        var sourceDevice = httpRequest.Headers["User-Agent"].ToString() ?? "Nieznany";
 
         await EnsureAccountNotBlocked(user.Id, sourceIP);
 
