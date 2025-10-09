@@ -163,7 +163,6 @@ public class VideoService : IVideoService
         }
 
         _filesService.DeleteVideo(id);
-        await _videoRepository.DeleteById(id);
 
         if (video.Status == VideoStatus.PUBLISHED)
         {
@@ -172,7 +171,11 @@ public class VideoService : IVideoService
                 using var client = new HttpClient();
                 await client.DeleteAsync($"{recommendationsAPI}/delete-video?id={id}");
             });
+
+            return;
         }
+
+        await _videoRepository.DeleteById(id);
     }
 
     public async Task<VideoDto> GetVideoById(string? sub, string id)
