@@ -37,4 +37,8 @@ public class User
 
     [Required]
     public int VideosCount { get; set; } = 0;
+
+    public List<double> Embedding {  get; set; } = new();
+
+    public int? FaissIndex { get; set; }
 }

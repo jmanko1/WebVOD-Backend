@@ -46,6 +46,10 @@ public class Video
     [Required]
     [BsonRepresentation(BsonType.ObjectId)]
     public string AuthorId { get; set; }
+
+    public List<double> Embedding { get; set; } = new();
+
+    public int? FaissIndex { get; set; }
 }
 
 public enum VideoCategory
