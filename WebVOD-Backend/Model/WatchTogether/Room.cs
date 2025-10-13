@@ -5,6 +5,7 @@ public class Room
     public string Id { get; }
     public string AccessCode { get; }
 
+    public string CurrentVideoId { get; set; } = string.Empty;
     public string CurrentVideoUrl { get; set; } = string.Empty;
     public string CurrentVideoTitle { get; set; } = string.Empty;
     public double LastKnownVideoTime { get; set; } = 0;

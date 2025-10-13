@@ -53,6 +53,7 @@ public class WatchTogetherHub : Hub
 
         var initialize = new InitializeConnection
         {
+            VideoId = room.CurrentVideoId,
             VideoUrl = room.CurrentVideoUrl,
             VideoTitle = room.CurrentVideoTitle,
             InitialTime = room.GetCurrentVideoTime(),
@@ -105,6 +106,7 @@ public class WatchTogetherHub : Hub
 
         var initialize = new InitializeConnection
         {
+            VideoId = room.CurrentVideoId,
             VideoUrl = room.CurrentVideoUrl,
             VideoTitle = room.CurrentVideoTitle,
             InitialTime = room.GetCurrentVideoTime(),
@@ -153,6 +155,7 @@ public class WatchTogetherHub : Hub
         lock (room.SyncRoot)
         {
             room.IsPlaying = false;
+            room.CurrentVideoId = video.Id ?? "";
             room.CurrentVideoUrl = video.VideoPath ?? "";
             room.CurrentVideoTitle = video.Title ?? "";
             room.PlayStartedAt = null;
@@ -164,7 +167,7 @@ public class WatchTogetherHub : Hub
 
         var videoChange = new VideoChangeDto
         {
-            Id = video.Id,
+            Id = room.CurrentVideoId,
             VideoUrl = room.CurrentVideoUrl,
             Title = room.CurrentVideoTitle
         };

@@ -2,6 +2,7 @@
 
 public class InitializeConnection
 {
+    public string VideoId { get; set; }
     public string VideoUrl { get; set; }
     public string VideoTitle { get; set; }
     public double InitialTime { get; set; }
