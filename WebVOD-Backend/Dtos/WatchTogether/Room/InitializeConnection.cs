@@ -1,4 +1,6 @@
-﻿namespace WebVOD_Backend.Dtos.WatchTogether.Room;
+﻿using WebVOD_Backend.Model.WatchTogether;
+
+namespace WebVOD_Backend.Dtos.WatchTogether.Room;
 
 public class InitializeConnection
 {
@@ -8,5 +10,5 @@ public class InitializeConnection
     public double InitialTime { get; set; }
     public bool IsPlaying { get; set; }
     public double? Countdown { get; set; }
-    public List<string> Participants { get; set; }
+    public List<Participant> Participants { get; set; }
 }

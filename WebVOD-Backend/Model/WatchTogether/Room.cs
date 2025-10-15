@@ -13,7 +13,7 @@ public class Room
     public DateTime? PlayStartedAt { get; set; }
     public DateTime? CountdownStartedAt { get; set; }
 
-    public Dictionary<string, string> Participants { get; set; } = new();
+    public Dictionary<string, Participant> Participants { get; set; } = new();
     public object SyncRoot { get; } = new();
 
     public Room(string id, string accessCode)
@@ -43,7 +43,7 @@ public class Room
 
     public bool VerifyAccessCode(string code) => string.Equals(code, AccessCode, StringComparison.Ordinal);
 
-    public List<string> GetParticipants()
+    public List<Participant> GetParticipants()
     {
         lock (SyncRoot)
         {
