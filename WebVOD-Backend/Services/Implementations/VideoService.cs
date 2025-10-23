@@ -74,22 +74,27 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Podaj tytuł.");
         }
 
-        if (createVideoDto.Tags.Count() > 10)
+        var formatedTags = createVideoDto.Tags
+            .Select(t => t.ToLower())
+            .OrderBy(t => t)
+            .ToList();
+
+        if (formatedTags.Count() > 15)
         {
-            throw new RequestErrorException(400, "Film może mieć maksymalnie 10 tagów.");
+            throw new RequestErrorException(400, "Film może mieć maksymalnie 15 tagów.");
         }
 
-        if (createVideoDto.Tags.Any(t => t.Length > 20))
+        if (formatedTags.Any(t => t.Length > 25))
         {
-            throw new RequestErrorException(400, "Tagi mogą mieć maksymalnie 20 znaków.");
+            throw new RequestErrorException(400, "Każdy tag może mieć maksymalnie 25 znaków.");
         }
 
-        if (createVideoDto.Tags.Distinct().Count() != createVideoDto.Tags.Count())
+        if (formatedTags.Distinct().Count() != formatedTags.Count())
         {
             throw new RequestErrorException(400, "Tagi muszą być unikalne.");
         }
 
-        if (createVideoDto.Tags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
+        if (formatedTags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
         {
             throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
         }
@@ -98,11 +103,6 @@ public class VideoService : IVideoService
         {
             throw new RequestErrorException(400, "Nieprawidłowa długość filmu.");
         }
-
-        var formatedTags = createVideoDto.Tags
-            .Select(t => t.ToLower())
-            .OrderBy(t => t)
-            .ToList();
 
         var video = new Video
         {
@@ -455,30 +455,30 @@ public class VideoService : IVideoService
             throw new RequestErrorException(400, "Podaj tytuł.");
         }
 
-        if (updateVideoDto.Tags.Count() > 10)
-        {
-            throw new RequestErrorException(400, "Film może mieć maksymalnie 10 tagów.");
-        }
-
-        if (updateVideoDto.Tags.Any(t => t.Length > 20))
-        {
-            throw new RequestErrorException(400, "Tagi mogą mieć maksymalnie 20 znaków.");
-        }
-
-        if (updateVideoDto.Tags.Distinct().Count() != updateVideoDto.Tags.Count())
-        {
-            throw new RequestErrorException(400, "Tagi muszą być unikalne.");
-        }
-
-        if (updateVideoDto.Tags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
-        {
-            throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
-        }
-
         var formatedTags = updateVideoDto.Tags
             .Select(t => t.ToLower())
             .OrderBy(t => t)
             .ToList();
+
+        if (formatedTags.Count() > 15)
+        {
+            throw new RequestErrorException(400, "Film może mieć maksymalnie 15 tagów.");
+        }
+
+        if (formatedTags.Any(t => t.Length > 25))
+        {
+            throw new RequestErrorException(400, "Każdy tag może mieć maksymalnie 25 znaków.");
+        }
+
+        if (formatedTags.Distinct().Count() != formatedTags.Count())
+        {
+            throw new RequestErrorException(400, "Tagi muszą być unikalne.");
+        }
+
+        if (formatedTags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
+        {
+            throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
+        }
 
         video.Title = updateVideoDto.Title;
         video.Description = updateVideoDto.Description;
