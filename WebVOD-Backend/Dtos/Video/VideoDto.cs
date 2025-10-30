@@ -7,11 +7,13 @@ public class VideoDto
     public string? Description { get; set; }
     public string Category { get; set; }
     public List<string> Tags { get; set; }
+    public bool TagsProposalsEnabled { get; set; }
     public string VideoPath { get; set; }
     public DateTime UploadDate { get; set; }
     public int LikesCount { get; set; }
     public int CommentsCount { get; set; }
     public int ViewsCount { get; set; }
+    public int? TagsPropositionsCount { get; set; } = null;
     public AuthorDto Author { get; set; }
 }
 

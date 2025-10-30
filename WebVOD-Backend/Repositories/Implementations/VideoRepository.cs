@@ -39,6 +39,14 @@ public class VideoRepository : IVideoRepository
         var result = await _videos.UpdateOneAsync(filter, update);
     }
 
+    public async Task DecrementTagsPropositionsCount(string id)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        var update = Builders<Video>.Update.Inc(v => v.TagsPropositionsCount, -1);
+
+        var result = await _videos.UpdateOneAsync(filter, update);
+    }
+
     public async Task DeleteById(string id)
     {
         var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
@@ -105,6 +113,14 @@ public class VideoRepository : IVideoRepository
     {
         var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
         var update = Builders<Video>.Update.Inc(v => v.LikesCount, 1);
+
+        var result = await _videos.UpdateOneAsync(filter, update);
+    }
+
+    public async Task IncrementTagsPropositionsCount(string id)
+    {
+        var filter = Builders<Video>.Filter.Eq(v => v.Id, id);
+        var update = Builders<Video>.Update.Inc(v => v.TagsPropositionsCount, 1);
 
         var result = await _videos.UpdateOneAsync(filter, update);
     }

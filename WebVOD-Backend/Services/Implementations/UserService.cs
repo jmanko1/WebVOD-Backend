@@ -247,6 +247,7 @@ public class UserService : IUserService
             UploadDate = v.UploadDate,
             ViewsCount = v.ViewsCount,
             Duration = v.Duration,
+            TagsProposalsEnabled = v.TagsProposalsEnabled
         }).ToList();
 
         return videoDtos;
@@ -269,6 +270,8 @@ public class UserService : IUserService
             ThumbnailPath = v.ThumbnailPath,
             UploadDate = v.UploadDate,
             ViewsCount = v.ViewsCount,
+            TagsPropositionsCount = v.TagsPropositionsCount,
+            TagsProposalsEnabled = v.TagsProposalsEnabled,
             Duration = v.Duration,
             Status = v.Status.ToString()
         }).ToList();

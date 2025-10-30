@@ -16,6 +16,7 @@ public static class ServicesLayerExtension
         services.AddScoped<IVideoService, VideoService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<ICaptchaService, CaptchaService>();
 
         var mongoSettings = configuration.GetSection("MongoDB");
         var connectionString = mongoSettings["ConnectionString"];

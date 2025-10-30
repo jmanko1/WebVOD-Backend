@@ -1,4 +1,5 @@
 ﻿using WebVOD_Backend.Dtos.Comment;
+using WebVOD_Backend.Dtos.TagsProposition;
 using WebVOD_Backend.Dtos.Video;
 
 namespace WebVOD_Backend.Services.Interfaces;
@@ -17,4 +18,9 @@ public interface IVideoService
     Task<VideoToUpdateDto> GetVideoToUpdateById(string sub, string id);
     Task UpdateVideoById(string sub, string id, UpdateVideoDto updateVideoDto);
     Task DeleteVideoById(string sub, string id);
+    Task ProposeTags(string sub, string videoId, NewTagsPropositionDto newTagsPropositionDto);
+    Task<List<TagsPropositionDto>> GetProposedTags(string sub, string videoId, int page, int size);
+    Task RejectProposedTags(string sub, string tagsPropositionId);
+    Task AcceptProposedTags(string sub, string tagsPropositionId);
+    Task<bool> HasUserProposedTags(string sub, string videoId);
 }

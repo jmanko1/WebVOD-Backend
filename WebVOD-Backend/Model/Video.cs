@@ -22,6 +22,10 @@ public class Video
     public VideoCategory Category { get; set; }
 
     public List<string> Tags { get; set; } = new();
+
+    [Required]
+    public bool TagsProposalsEnabled {  get; set; }
+    
     public string? VideoPath { get; set; }
     public string? ThumbnailPath { get; set; }
 
@@ -37,6 +41,10 @@ public class Video
     [Required]
     public int ViewsCount { get; set; } = 0;
 
+    [Required]
+    public int TagsPropositionsCount { get; set; } = 0;
+
+    [Required]
     public int Duration { get; set; } = 0;
 
     [Required]

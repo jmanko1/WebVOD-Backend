@@ -8,6 +8,7 @@ public class MongoIndexInitializer
     private readonly IMongoCollection<ResetPasswordToken> _resetPasswordTokens;
     private readonly IMongoCollection<BlacklistedToken> _blacklistedTokens;
     private readonly IMongoCollection<UserBlockade> _userBlockades;
+    private readonly IMongoCollection<TagsProposition> _tagsPropositions;
 
     public MongoIndexInitializer(IMongoClient mongoClient, IConfiguration configuration)
     {
@@ -17,6 +18,7 @@ public class MongoIndexInitializer
         _resetPasswordTokens = database.GetCollection<ResetPasswordToken>("ResetPasswordTokens");
         _blacklistedTokens = database.GetCollection<BlacklistedToken>("BlacklistedTokens");
         _userBlockades = database.GetCollection<UserBlockade>("UserBlockades");
+        _tagsPropositions = database.GetCollection<TagsProposition>("TagsPropositions");
     }
 
     public async Task AddResetPasswordTokensIndexes()
@@ -59,5 +61,19 @@ public class MongoIndexInitializer
         var indexModel = new CreateIndexModel<UserBlockade>(indexKeys, indexOptions);
 
         await _userBlockades.Indexes.CreateOneAsync(indexModel);
+    }
+
+    public async Task AddTagsPropositionsIndexes()
+    {
+        var indexKeys = Builders<TagsProposition>.IndexKeys.Ascending(p => p.ValidUntil);
+
+        var indexOptions = new CreateIndexOptions
+        {
+            ExpireAfter = TimeSpan.Zero
+        };
+
+        var indexModel = new CreateIndexModel<TagsProposition>(indexKeys, indexOptions);
+
+        await _tagsPropositions.Indexes.CreateOneAsync(indexModel);
     }
 }

@@ -12,6 +12,8 @@ public interface IVideoRepository
     Task DecrementCommentsCount(string id);
     Task IncrementLikesCount(string id);
     Task DecrementLikesCount(string id);
+    Task IncrementTagsPropositionsCount(string id);
+    Task DecrementTagsPropositionsCount(string id);
     Task<bool> ExistsById(string id);
     Task Add(Video video);
     Task Replace(string id, Video video);

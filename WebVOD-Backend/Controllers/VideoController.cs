@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebVOD_Backend.Dtos.Comment;
+using WebVOD_Backend.Dtos.TagsProposition;
 using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
@@ -273,6 +274,116 @@ public class VideoController : ControllerBase
             await _videoService.DeleteVideoById(sub, id);
 
             return Ok("Film został usunięty.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPost("{videoId}/tag-proposals")]
+    public async Task<ActionResult> ProposeTags(string videoId, [FromBody] NewTagsPropositionDto newTagsPropositionDto)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.ProposeTags(sub, videoId, newTagsPropositionDto);
+
+            return Ok("Wysłano propozycję tagów.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("{videoId}/tag-proposals")]
+    public async Task<ActionResult<List<TagsPropositionDto>>> GetProposedTags(string videoId, int page = 1, int size = 10)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var propositions = await _videoService.GetProposedTags(sub, videoId, page, size);
+
+            return Ok(propositions);
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpDelete("tag-proposals/{id}")]
+    public async Task<ActionResult> RejectProposedTags(string id)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.RejectProposedTags(sub, id);
+
+            return Ok("Odrzucono propozycję tagów.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("tag-proposals/{id}")]
+    public async Task<ActionResult> AcceptProposedTags(string id)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _videoService.AcceptProposedTags(sub, id);
+
+            return Ok("Zaakceptowano propozycję tagów.");
+        }
+        catch (RequestErrorException ex)
+        {
+            return StatusCode(ex.StatusCode, new { ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("{videoId}/tag-proposals/user-status")]
+    public async Task<ActionResult<bool>> GetTagProposalStatus(string videoId)
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var hasProposed = await _videoService.HasUserProposedTags(sub, videoId);
+
+            return Ok(hasProposed);
         }
         catch (RequestErrorException ex)
         {

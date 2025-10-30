@@ -17,4 +17,8 @@ public class UpdateVideoDto
     public VideoCategory Category { get; set; }
 
     public List<string> Tags { get; set; }
+
+    [Required]
+    public bool TagsProposalsEnabled { get; set; }
+
 }

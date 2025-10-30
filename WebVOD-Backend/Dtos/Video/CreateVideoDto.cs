@@ -17,5 +17,10 @@ public class CreateVideoDto
     public VideoCategory Category { get; set; }
 
     public List<string> Tags { get; set; }
+
+    [Required]
+    public bool TagsProposalsEnabled { get; set; }
+
+    [Required]
     public int Duration { get; set; }
 }

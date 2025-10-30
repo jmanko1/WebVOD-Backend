@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using MongoDB.Bson;
 using WebVOD_Backend.Dtos.Comment;
+using WebVOD_Backend.Dtos.TagsProposition;
 using WebVOD_Backend.Dtos.Video;
 using WebVOD_Backend.Exceptions;
 using WebVOD_Backend.Model;
@@ -19,10 +20,11 @@ public class VideoService : IVideoService
     private readonly ILikeRepository _likeRepository;
     private readonly IFilesService _filesService;
     private readonly IWatchingHistoryElementRepository _watchingHistoryElementRepository;
+    private readonly ITagsPropositionRepository _tagsPropositionRepository;
 
     private const string recommendationsAPI = "http://localhost:5000";
 
-    public VideoService(IVideoRepository videoRepository, IUserRepository userRepository, ICommentRepository commentRepository, ILikeRepository likeRepository, IFilesService filesService, IWatchingHistoryElementRepository watchingHistoryElementRepository)
+    public VideoService(IVideoRepository videoRepository, IUserRepository userRepository, ICommentRepository commentRepository, ILikeRepository likeRepository, IFilesService filesService, IWatchingHistoryElementRepository watchingHistoryElementRepository, ITagsPropositionRepository tagsPropositionRepository)
     {
         _videoRepository = videoRepository;
         _userRepository = userRepository;
@@ -30,6 +32,7 @@ public class VideoService : IVideoService
         _likeRepository = likeRepository;
         _filesService = filesService;
         _watchingHistoryElementRepository = watchingHistoryElementRepository;
+        _tagsPropositionRepository = tagsPropositionRepository;
     }
 
     public async Task CancelLikeVideo(string sub, string id)
@@ -79,9 +82,9 @@ public class VideoService : IVideoService
             .OrderBy(t => t)
             .ToList();
 
-        if (formatedTags.Count() > 15)
+        if (formatedTags.Count() > 20)
         {
-            throw new RequestErrorException(400, "Film może mieć maksymalnie 15 tagów.");
+            throw new RequestErrorException(400, "Film może mieć maksymalnie 20 tagów.");
         }
 
         if (formatedTags.Any(t => t.Length > 25))
@@ -111,7 +114,8 @@ public class VideoService : IVideoService
             Category = createVideoDto.Category,
             Tags = formatedTags,
             AuthorId = user.Id,
-            Duration = createVideoDto.Duration
+            Duration = createVideoDto.Duration,
+            TagsProposalsEnabled = createVideoDto.TagsProposalsEnabled
         };
 
         await _videoRepository.Add(video);
@@ -155,6 +159,7 @@ public class VideoService : IVideoService
         await _likeRepository.DeleteByVideoId(id);
         await _commentRepository.DeleteByVideoId(id);
         await _watchingHistoryElementRepository.DeleteByVideoId(id);
+        await _tagsPropositionRepository.DeleteByVideoId(id);
 
         if (video.ThumbnailPath != null)
         {
@@ -199,9 +204,11 @@ public class VideoService : IVideoService
 
         await _videoRepository.IncrementViewsCount(id);
 
+        User? viewer = null;
+
         if (sub != null)
         {
-            var viewer = await _userRepository.FindByLogin(sub);
+            viewer = await _userRepository.FindByLogin(sub);
             if (viewer != null)
             {
                 if (await _watchingHistoryElementRepository.ExistsByVideoIdAndViewerId(video.Id, viewer.Id))
@@ -228,11 +235,13 @@ public class VideoService : IVideoService
             Description = video.Description ?? "Brak opisu.",
             Category = video.Category.ToString(),
             Tags = video.Tags,
+            TagsProposalsEnabled = video.TagsProposalsEnabled,
             VideoPath = video.VideoPath,
             UploadDate = video.UploadDate,
             LikesCount = video.LikesCount,
             CommentsCount = video.CommentsCount,
             ViewsCount = video.ViewsCount + 1,
+            TagsPropositionsCount = viewer != null && viewer.Id == video.AuthorId ? video.TagsPropositionsCount : null,
             Author = new AuthorDto
             {
                 Id = author.Id,
@@ -303,6 +312,7 @@ public class VideoService : IVideoService
             Description = video.Description,
             Category = video.Category.ToString(),
             Tags = video.Tags,
+            TagsProposalsEnabled = video.TagsProposalsEnabled,
             ThumbnailPath = video.ThumbnailPath
         };
 
@@ -460,9 +470,9 @@ public class VideoService : IVideoService
             .OrderBy(t => t)
             .ToList();
 
-        if (formatedTags.Count() > 15)
+        if (formatedTags.Count() > 20)
         {
-            throw new RequestErrorException(400, "Film może mieć maksymalnie 15 tagów.");
+            throw new RequestErrorException(400, "Film może mieć maksymalnie 20 tagów.");
         }
 
         if (formatedTags.Any(t => t.Length > 25))
@@ -484,6 +494,7 @@ public class VideoService : IVideoService
         video.Description = updateVideoDto.Description;
         video.Category = updateVideoDto.Category;
         video.Tags = formatedTags;
+        video.TagsProposalsEnabled = updateVideoDto.TagsProposalsEnabled;
 
         await _videoRepository.Replace(id, video);
 
@@ -664,5 +675,279 @@ public class VideoService : IVideoService
         }
 
         await _videoRepository.UpdateStatus(id, VideoStatus.FAILED);
+    }
+
+    public async Task ProposeTags(string sub, string videoId,NewTagsPropositionDto newTagsPropositionDto)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!ObjectId.TryParse(videoId, out _))
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        var video = await _videoRepository.FindById(videoId);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        if (video.AuthorId == user.Id)
+        {
+            throw new RequestErrorException(403, "Propozycji tagów nie może wysłać autor filmu.");
+        }
+
+        if (!video.TagsProposalsEnabled)
+        {
+            throw new RequestErrorException(403, "Autor filmu nie pozwala na proponowanie tagów.");
+        }
+
+        if (await _tagsPropositionRepository.ExistsByVideoIdAndUserId(video.Id, user.Id))
+        {
+            throw new RequestErrorException(400, "Propozycja tagów już została wysłana.");
+        }
+
+        if (newTagsPropositionDto.Tags == null || newTagsPropositionDto.Tags.Count == 0)
+        {
+            throw new RequestErrorException(400, "Podaj listę tagów.");
+        }
+
+        var formatedTags = newTagsPropositionDto.Tags
+            .Select(t => t.ToLower())
+            .ToList();
+
+        if (formatedTags.Count() > 5)
+        {
+            throw new RequestErrorException(400, "Można zaproponować maksymalnie 5 tagów.");
+        }
+
+        if (formatedTags.Any(t => t.Length > 25))
+        {
+            throw new RequestErrorException(400, "Każdy tag może mieć maksymalnie 25 znaków.");
+        }
+
+        if (formatedTags.Distinct().Count() != formatedTags.Count())
+        {
+            throw new RequestErrorException(400, "Tagi muszą być unikalne.");
+        }
+
+        if (formatedTags.Any(t => t.Any(c => !char.IsLetterOrDigit(c))))
+        {
+            throw new RequestErrorException(400, "Tagi mogą zawierać tylko litery i cyfry.");
+        }
+
+        var result = video.Tags.Concat(formatedTags).ToList();
+        var duplicates = result
+            .GroupBy(t => t)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicates.Count() > 0)
+        {
+            throw new RequestErrorException(400, $"Następujące tagi są już zapisane w filmie: {string.Join(", ", duplicates)}.");
+        }
+
+        if (formatedTags.Count() + video.Tags.Count() > 20)
+        {
+            throw new RequestErrorException(400, "Liczba proponowanych tagów + liczba już zapisanych tagów nie może przekraczać 20.");
+        }
+
+        var proposition = new TagsProposition
+        {
+            VideoId = video.Id,
+            UserId = user.Id,
+            Tags = formatedTags,
+            Comment = newTagsPropositionDto.Comment
+        };
+
+        await _tagsPropositionRepository.Add(proposition);
+        await _videoRepository.IncrementTagsPropositionsCount(video.Id);
+    }
+
+    public async Task<List<TagsPropositionDto>> GetProposedTags(string sub, string videoId, int page, int size)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!ObjectId.TryParse(videoId, out _))
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        var video = await _videoRepository.FindById(videoId);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień");
+        }
+
+        var propositions = await _tagsPropositionRepository.FindByVideoId(videoId, page, size);
+        var authorIds = propositions.Select(p => p.UserId).Distinct().ToList();
+        var authors = await _userRepository.FindById(authorIds);
+        var authorsDict = authors.ToDictionary(a => a.Id);
+
+        var propositionDtos = propositions.Select(p => new TagsPropositionDto
+        {
+            Id = p.Id,
+            VideoId = p.VideoId,
+            Author = new AuthorDto
+            {
+                Id = p.UserId,
+                Login = authorsDict[p.UserId].Login,
+                ImageUrl = authorsDict[p.UserId].ImageUrl
+            },
+            Tags = p.Tags,
+            Comment = p.Comment,
+            CreatedAt = p.CreatedAt,
+            ValidUntil = p.ValidUntil
+        }).ToList();
+
+        return propositionDtos;
+    }
+
+    public async Task RejectProposedTags(string sub, string tagsPropositionId)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!ObjectId.TryParse(tagsPropositionId, out _))
+        {
+            throw new RequestErrorException(404, "Nie znaleziono propozycji.");
+        }
+
+        var tagsProposition = await _tagsPropositionRepository.FindById(tagsPropositionId);
+        if (tagsProposition == null)
+        {
+            throw new RequestErrorException(404, "Nie znaleziono propozycji.");
+        }
+
+        var video = await _videoRepository.FindById(tagsProposition.VideoId);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(500, "Nie znaleziono filmu.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień.");
+        }
+
+        await _tagsPropositionRepository.DeleteById(tagsPropositionId);
+        await _videoRepository.DecrementTagsPropositionsCount(video.Id);
+    }
+
+    public async Task AcceptProposedTags(string sub, string tagsPropositionId)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!ObjectId.TryParse(tagsPropositionId, out _))
+        {
+            throw new RequestErrorException(404, "Nie znaleziono propozycji.");
+        }
+
+        var tagsProposition = await _tagsPropositionRepository.FindById(tagsPropositionId);
+        if (tagsProposition == null)
+        {
+            throw new RequestErrorException(404, "Nie znaleziono propozycji.");
+        }
+
+        if (tagsProposition.ValidUntil <  DateTime.UtcNow)
+        {
+            throw new RequestErrorException(400, "Propozycja wygasła.");
+        }
+
+        var video = await _videoRepository.FindById(tagsProposition.VideoId);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(500, "Nie znaleziono filmu.");
+        }
+
+        if (video.AuthorId != user.Id)
+        {
+            throw new RequestErrorException(403, "Brak uprawnień.");
+        }
+
+        var result = video.Tags.Concat(tagsProposition.Tags).OrderBy(t => t).ToList();
+        var duplicates = result
+            .GroupBy(t => t)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicates.Count() > 0)
+        {
+            throw new RequestErrorException(400, $"Następujące tagi są już zapisane w filmie: {string.Join(", ", duplicates)}.");
+        }
+
+        if (result.Count() > 20)
+        {
+            throw new RequestErrorException(400, "Liczba proponowanych tagów + liczba już zapisanych tagów nie może przekraczać 20.");
+        }
+
+        video.Tags = result;
+        video.TagsPropositionsCount -= 1;
+        await _videoRepository.Replace(video.Id, video);
+
+        await _tagsPropositionRepository.DeleteById(tagsPropositionId);
+
+
+        _ = Task.Run(async () =>
+        {
+            var videoData = new
+            {
+                Title = video.Title,
+                Description = video.Description,
+                Category = video.Category.ToString(),
+                Tags = video.Tags,
+                AuthorLogin = sub
+            };
+
+            var json = JsonSerializer.Serialize(videoData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            using var client = new HttpClient();
+            await client.PutAsync($"{recommendationsAPI}/update-video?id={video.Id}", content);
+        });
+    }
+
+    public async Task<bool> HasUserProposedTags(string sub, string videoId)
+    {
+        var user = await _userRepository.FindByLogin(sub);
+        if (user == null)
+        {
+            throw new RequestErrorException(401);
+        }
+
+        if (!ObjectId.TryParse(videoId, out _))
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        var video = await _videoRepository.FindById(videoId);
+        if (video == null || video.Status != VideoStatus.PUBLISHED)
+        {
+            throw new RequestErrorException(404, "Nie znaleziono filmu.");
+        }
+
+        return await _tagsPropositionRepository.ExistsByVideoIdAndUserId(video.Id, user.Id);
     }
 }

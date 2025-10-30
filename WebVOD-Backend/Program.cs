@@ -48,8 +48,11 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var indexInitializer = scope.ServiceProvider.GetRequiredService<MongoIndexInitializer>();
+
     await indexInitializer.AddResetPasswordTokensIndexes();
     await indexInitializer.AddBlacklistedTokensIndexes();
+    await indexInitializer.AddTagsPropositionsIndexes();
+    await indexInitializer.AddUserBlockadesIndexes();
 }
 
 app.UseCors("AllowClient");
