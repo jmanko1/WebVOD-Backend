@@ -1,4 +1,6 @@
-﻿namespace WebVOD_Backend.Model.WatchTogether;
+﻿using System.Collections.Concurrent;
+
+namespace WebVOD_Backend.Model.WatchTogether;
 
 public class Room
 {
@@ -13,8 +15,7 @@ public class Room
     public DateTime? PlayStartedAt { get; set; }
     public DateTime? CountdownStartedAt { get; set; }
 
-    public Dictionary<string, Participant> Participants { get; set; } = new();
-    public object SyncRoot { get; } = new();
+    public ConcurrentDictionary<string, Participant> Participants { get; set; } = new();
 
     public Room(string id, string accessCode)
     {
@@ -45,9 +46,6 @@ public class Room
 
     public List<Participant> GetParticipants()
     {
-        lock (SyncRoot)
-        {
-            return Participants.Values.ToList();
-        }
+        return Participants.Values.ToList();
     }
 }

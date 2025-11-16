@@ -49,16 +49,13 @@ public class WatchTogetherHub : Hub
 
         var room = new Room(roomId, accessCode);
 
-        lock (room.SyncRoot)
+        room.Participants[Context.ConnectionId] = new Participant
         {
-            room.Participants[Context.ConnectionId] = new Participant
-            {
-                Login = user.Login,
-                ImageUrl = user.ImageUrl
-            };
+            Login = user.Login,
+            ImageUrl = user.ImageUrl ?? string.Empty
+        };
 
-            Rooms[roomId] = room;
-        }
+        Rooms[roomId] = room;
 
         ConnectionToRoom[Context.ConnectionId] = roomId;
 
@@ -80,6 +77,7 @@ public class WatchTogetherHub : Hub
             RoomId = roomId,
             AccessCode = accessCode
         };
+
         return createdRoom;
     }
 
@@ -102,26 +100,23 @@ public class WatchTogetherHub : Hub
             throw new HubException("Nieprawidłowy kod dostępu.");
         }
 
-        lock (room.SyncRoot)
+        if (room.Participants.Count >= 3 && !room.Participants.ContainsKey(Context.ConnectionId))
         {
-            if (room.Participants.Count >= 3 && !room.Participants.ContainsKey(Context.ConnectionId))
-            {
-                throw new HubException("Pokój jest pełny (maks. 3 uczestników).");
-            }
-
-            if (room.Participants.Any(p => p.Value.Login == login))
-            {
-                throw new HubException("Użytkownik już połączony z tym pokojem.");
-            }
-
-            room.Participants[Context.ConnectionId] = new Participant
-            {
-                Login = user.Login,
-                ImageUrl = user.ImageUrl
-            };
-
-            Rooms[roomId] = room;
+            throw new HubException("Pokój jest pełny (maks. 3 uczestników).");
         }
+
+        if (room.Participants.Any(p => p.Value.Login == login))
+        {
+            throw new HubException("Użytkownik już połączony z tym pokojem.");
+        }
+
+        room.Participants[Context.ConnectionId] = new Participant
+        {
+            Login = user.Login,
+            ImageUrl = user.ImageUrl ?? string.Empty
+        };
+
+        Rooms[roomId] = room;
 
         ConnectionToRoom[Context.ConnectionId] = roomId;
 
@@ -179,18 +174,15 @@ public class WatchTogetherHub : Hub
             throw new HubException("Nie znaleziono filmu.");
         }
 
-        lock (room.SyncRoot)
-        {
-            room.IsPlaying = false;
-            room.CurrentVideoId = video.Id ?? "";
-            room.CurrentVideoUrl = video.VideoPath ?? "";
-            room.CurrentVideoTitle = video.Title ?? "";
-            room.PlayStartedAt = null;
-            room.LastKnownVideoTime = 0;
-            room.CountdownStartedAt = DateTime.UtcNow;
+        room.IsPlaying = false;
+        room.CurrentVideoId = video.Id ?? "";
+        room.CurrentVideoUrl = video.VideoPath ?? "";
+        room.CurrentVideoTitle = video.Title ?? "";
+        room.PlayStartedAt = null;
+        room.LastKnownVideoTime = 0;
+        room.CountdownStartedAt = DateTime.UtcNow;
 
-            Rooms[roomId] = room;
-        }
+        Rooms[roomId] = room;
 
         var videoChange = new VideoChangeDto
         {
@@ -212,15 +204,12 @@ public class WatchTogetherHub : Hub
             throw new HubException("Nie znaleziono pokoju.");
         }
 
-        lock (room.SyncRoot)
-        {
-            room.LastKnownVideoTime = time;
-            room.IsPlaying = playing;
-            room.PlayStartedAt = playing ? DateTime.UtcNow : null;
-            room.CountdownStartedAt = null;
+        room.LastKnownVideoTime = time;
+        room.IsPlaying = playing;
+        room.PlayStartedAt = playing ? DateTime.UtcNow : null;
+        room.CountdownStartedAt = null;
 
-            Rooms[roomId] = room;
-        }
+        Rooms[roomId] = room;
 
         await Clients.OthersInGroup(roomId).SendAsync("PlayPause", playing);
     }
@@ -235,26 +224,21 @@ public class WatchTogetherHub : Hub
             throw new HubException("Nie znaleziono pokoju.");
         }
 
-        lock (room.SyncRoot)
+        room.LastKnownVideoTime = time;
+        if (room.IsPlaying)
         {
-            room.LastKnownVideoTime = time;
-            if (room.IsPlaying)
-            {
-                room.PlayStartedAt = DateTime.UtcNow;
-            }
-
-            Rooms[roomId] = room;
+            room.PlayStartedAt = DateTime.UtcNow;
         }
+
+        Rooms[roomId] = room;
 
         await Clients.OthersInGroup(roomId).SendAsync("Seek", time);
     }
 
     public async Task LeaveRoom()
     {
-        if (!ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
-            return;
-
-        await RemoveFromRoom(roomId, Context.ConnectionId);
+        if (ConnectionToRoom.TryGetValue(Context.ConnectionId, out var roomId))
+            await RemoveFromRoom(roomId, Context.ConnectionId);
     }
 
     public async Task SendMessage(string message)
@@ -373,21 +357,16 @@ public class WatchTogetherHub : Hub
 
         ConnectionToRoom.TryRemove(connectionId, out _);
 
-        var leavingLogin = string.Empty;
+        room.Participants.Remove(connectionId, out var participant);
 
-        lock (room.SyncRoot)
+        if (room.Participants.Count <= 0)
         {
-            room.Participants.Remove(connectionId, out var participant);
-
-            if (room.Participants.Count <= 0)
-            {
-                Rooms.TryRemove(roomId, out _);
-                return;
-            }
-
-            Rooms[roomId] = room;
-            leavingLogin = participant.Login;
+            Rooms.TryRemove(roomId, out _);
+            return;
         }
+
+        Rooms[roomId] = room;
+        var leavingLogin = participant?.Login ?? string.Empty;
 
         var systemLeaveMessage = new MessageDto
         {
